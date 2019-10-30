@@ -35,7 +35,9 @@ where
 }
 
 fn read_integer<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
-    map_res(digit1, |s: &str| s.parse::<BigInt>().map(Atom::Integer))(input)
+    map_res(recognize(preceded(opt(char('-')), digit1)), |s: &str| {
+        s.parse::<BigInt>().map(Atom::Integer)
+    })(input)
 }
 
 fn read_keyword<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
