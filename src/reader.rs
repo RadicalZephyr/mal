@@ -2,7 +2,7 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     character::complete::{alpha1, alphanumeric1, anychar, char, digit1, not_line_ending},
-    combinator::{map, map_res, recognize, value},
+    combinator::{map, map_res, opt, recognize, value},
     error::{ErrorKind, ParseError, VerboseError},
     multi::{many0, many_till, separated_list},
     sequence::{preceded, tuple},
@@ -86,7 +86,7 @@ fn read_list<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, For
 }
 
 fn read_form<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
-    alt((read_list, read_atom))(input)
+    preceded(opt(whitespace1), alt((read_list, read_atom)))(input)
 }
 
 pub fn read_str(input: &str) -> Result<Form, ()> {
