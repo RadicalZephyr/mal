@@ -1,7 +1,7 @@
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{alpha1, alphanumeric1, anychar, char, digit1, not_line_ending},
+    character::complete::{alpha1, alphanumeric1, anychar, char, digit0, digit1, not_line_ending},
     combinator::{map, map_res, opt, recognize, value},
     error::{ErrorKind, ParseError, VerboseError},
     multi::{many0, many_till, separated_list},
@@ -9,7 +9,7 @@ use nom::{
     AsChar, IResult, InputTakeAtPosition,
 };
 
-use num_bigint::BigInt;
+use rug::{Float, Integer};
 
 use crate::{Atom, Form};
 
@@ -34,9 +34,19 @@ where
     )
 }
 
+fn read_float<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
+    map_res(
+        recognize(tuple((read_integer, char('.'), digit0))),
+        |s: &'a str| {
+            s.parse::<f64>()
+                .map(|v| Atom::Float(Float::with_val(12, v)))
+        },
+    )(input)
+}
+
 fn read_integer<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
     map_res(recognize(preceded(opt(char('-')), digit1)), |s: &str| {
-        s.parse::<BigInt>().map(Atom::Integer)
+        s.parse::<Integer>().map(Atom::Integer)
     })(input)
 }
 
@@ -70,6 +80,7 @@ fn read_nil<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom
 fn read_atom<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     map(
         alt((
+            read_float,
             read_integer,
             read_keyword,
             read_string,

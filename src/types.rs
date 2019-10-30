@@ -1,15 +1,16 @@
-use num_bigint::BigInt;
+use rug::{Float, Integer};
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Atom {
-    Integer(BigInt),
+    Float(Float),
+    Integer(Integer),
     Keyword(String),
     Nil,
     String(String),
     Symbol(String),
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Form {
     Atom(Atom),
     List(Vec<Form>),

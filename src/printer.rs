@@ -7,6 +7,7 @@ impl fmt::Display for Atom {
         use crate::Atom::*;
 
         match self {
+            Float(value) => value.fmt(f),
             Integer(value) => value.fmt(f),
             Symbol(name) | Keyword(name) => f.write_str(&name),
             String(contents) => write!(f, r#""{}""#, contents),
