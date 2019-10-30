@@ -1,22 +1,37 @@
-use std::fmt::Write;
+use std::fmt;
 
-use crate::Form;
+use crate::{Atom, Form};
 
-fn pr_str_iter(form: &Form, buffer: &mut String) {
-    match form {
-        Form::Atom(atom) => write!(buffer, "{:?}", atom).unwrap(),
-        Form::List(forms) => {
-            buffer.write_str("(").unwrap();
-            for form in forms {
-                pr_str_iter(form, buffer)
+impl fmt::Display for Atom {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use crate::Atom::*;
+
+        match self {
+            Integer(value) => value.fmt(f),
+            Symbol(name) | Keyword(name) => f.write_str(&name),
+            String(contents) => write!(f, r#""{}""#, contents),
+            Nil => f.write_str("nil"),
+        }
+    }
+}
+
+impl fmt::Display for Form {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Form::Atom(atom) => atom.fmt(f),
+            Form::List(forms) => {
+                let mut sep = "";
+                f.write_str("(")?;
+                for form in forms {
+                    write!(f, "{}{}", sep, form)?;
+                    sep = " ";
+                }
+                f.write_str(")")
             }
-            buffer.write_str(")").unwrap();
         }
     }
 }
 
 pub fn pr_str(form: &Form) -> String {
-    let mut buffer = String::new();
-    pr_str_iter(form, &mut buffer);
-    buffer
+    format!("{}", form)
 }
