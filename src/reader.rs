@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -11,7 +13,9 @@ use nom::{
 
 use rug::{Float, Integer};
 
-use crate::{Atom, Form};
+use crate::{Atom, Bool, Form};
+
+// -------------------- Utility Functions --------------------
 
 fn comment<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
     preceded(tag(";;"), not_line_ending)(input)
@@ -57,6 +61,8 @@ where
     input.split_at_position1_complete(|item| whitespacechar(item.as_char()), ErrorKind::Space)
 }
 
+// -------------------- Atom Readers --------------------
+
 fn read_float<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
     map_res(
         recognize(tuple((read_integer, char('.'), digit0))),
@@ -73,8 +79,8 @@ fn read_integer<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, 
     })(input)
 }
 
-fn read_keyword<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
-    map(symbolchar1, |s: &str| Atom::Keyword(s.to_string()))(input)
+fn read_nil<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
+    value(Atom::Nil, tag("nil"))(input)
 }
 
 fn read_string<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
@@ -86,24 +92,37 @@ fn read_string<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, A
     )(input)
 }
 
-fn read_symbol<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
-    map(symbolchar1, |s: &str| Atom::Symbol(s.to_string()))(input)
+pub struct NotABoolean;
+
+impl FromStr for Bool {
+    type Err = NotABoolean;
+
+    fn from_str(s: &str) -> Result<Bool, Self::Err> {
+        match s {
+            "true" => Ok(Bool::True),
+            "false" => Ok(Bool::False),
+            _ => Err(NotABoolean),
+        }
+    }
 }
 
-fn read_nil<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
-    value(Atom::Nil, tag("nil"))(input)
+fn read_symbol<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
+    let (input, symbolname) = symbolchar1(input)?;
+    if let Ok(boolean) = symbolname.parse::<Bool>() {
+        return Ok((input, Atom::Bool(boolean)));
+    }
+    if symbolname.starts_with(':') {
+        Ok((input, Atom::Keyword(symbolname.to_string())))
+    } else {
+        Ok((input, Atom::Symbol(symbolname.to_string())))
+    }
 }
+
+// -------------------- Form Readers --------------------
 
 fn read_atom<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     map(
-        alt((
-            read_float,
-            read_integer,
-            read_keyword,
-            read_string,
-            read_nil,
-            read_symbol,
-        )),
+        alt((read_float, read_integer, read_string, read_nil, read_symbol)),
         Form::Atom,
     )(input)
 }

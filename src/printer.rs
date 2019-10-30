@@ -5,8 +5,13 @@ use crate::{Atom, Form};
 impl fmt::Display for Atom {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use crate::Atom::*;
+        use crate::Bool::*;
 
         match self {
+            Bool(value) => match value {
+                True => f.write_str("true"),
+                False => f.write_str("false"),
+            },
             Float(value) => value.fmt(f),
             Integer(value) => value.fmt(f),
             Symbol(name) | Keyword(name) => f.write_str(&name),

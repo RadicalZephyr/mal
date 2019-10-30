@@ -1,7 +1,14 @@
 use rug::{Float, Integer};
 
 #[derive(Clone, Debug, PartialEq)]
+pub enum Bool {
+    True,
+    False,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Atom {
+    Bool(Bool),
     Float(Float),
     Integer(Integer),
     Keyword(String),
