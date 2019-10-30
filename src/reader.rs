@@ -17,7 +17,25 @@ fn comment<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a s
     preceded(tag(";;"), not_line_ending)(input)
 }
 
-pub fn whitespace1<T, E: ParseError<T>>(input: T) -> IResult<T, T, E>
+fn symbolchar1<T, E: ParseError<T>>(input: T) -> IResult<T, T, E>
+where
+    T: InputTakeAtPosition,
+    <T as InputTakeAtPosition>::Item: AsChar + Clone,
+{
+    input.split_at_position1_complete(
+        |item| {
+            let c = item.as_char();
+            match c {
+                '"' | '\'' | '(' | ')' | '[' | ']' | '{' | '}' | '#' | ' ' | ',' | '\r' | '\n'
+                | '\t' => true,
+                _ => false,
+            }
+        },
+        ErrorKind::Space,
+    )
+}
+
+fn whitespace1<T, E: ParseError<T>>(input: T) -> IResult<T, T, E>
 where
     T: InputTakeAtPosition,
     <T as InputTakeAtPosition>::Item: AsChar + Clone,
@@ -51,10 +69,7 @@ fn read_integer<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, 
 }
 
 fn read_keyword<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
-    map(
-        recognize(tuple((tag(":"), many0(alphanumeric1)))),
-        |s: &str| Atom::Keyword(s.to_string()),
-    )(input)
+    map(symbolchar1, |s: &str| Atom::Keyword(s.to_string()))(input)
 }
 
 fn read_string<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
@@ -67,10 +82,7 @@ fn read_string<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, A
 }
 
 fn read_symbol<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
-    map(
-        recognize(tuple((alpha1, many0(alphanumeric1)))),
-        |s: &str| Atom::Symbol(s.to_string()),
-    )(input)
+    map(symbolchar1, |s: &str| Atom::Symbol(s.to_string()))(input)
 }
 
 fn read_nil<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
