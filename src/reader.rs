@@ -1,10 +1,10 @@
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{alpha1, alphanumeric1, anychar, char, digit0, digit1, not_line_ending},
+    character::complete::{anychar, char, digit0, digit1, not_line_ending},
     combinator::{map, map_res, opt, recognize, value},
     error::{ErrorKind, ParseError, VerboseError},
-    multi::{many0, many_till, separated_list},
+    multi::{many_till, separated_list},
     sequence::{preceded, tuple},
     AsChar, IResult, InputTakeAtPosition,
 };
@@ -17,39 +17,44 @@ fn comment<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a s
     preceded(tag(";;"), not_line_ending)(input)
 }
 
+fn symbolchar(c: char) -> bool {
+    match c {
+        '"' | '\'' | '(' | ')' | '[' | ']' | '{' | '}' | '#' | ' ' | ',' | '\r' | '\n' | '\t' => {
+            true
+        }
+        _ => false,
+    }
+}
+
 fn symbolchar1<T, E: ParseError<T>>(input: T) -> IResult<T, T, E>
 where
     T: InputTakeAtPosition,
-    <T as InputTakeAtPosition>::Item: AsChar + Clone,
+    <T as InputTakeAtPosition>::Item: AsChar,
 {
-    input.split_at_position1_complete(
-        |item| {
-            let c = item.as_char();
-            match c {
-                '"' | '\'' | '(' | ')' | '[' | ']' | '{' | '}' | '#' | ' ' | ',' | '\r' | '\n'
-                | '\t' => true,
-                _ => false,
-            }
-        },
-        ErrorKind::Space,
-    )
+    input.split_at_position1_complete(|item| symbolchar(item.as_char()), ErrorKind::Space)
+}
+
+fn whitespacechar(c: char) -> bool {
+    match c {
+        ' ' | ',' | '\t' | '\r' | '\n' => false,
+        _ => true,
+    }
+}
+
+fn whitespace0<T, E: ParseError<T>>(input: T) -> IResult<T, T, E>
+where
+    T: InputTakeAtPosition,
+    <T as InputTakeAtPosition>::Item: AsChar,
+{
+    input.split_at_position_complete(|item| whitespacechar(item.as_char()))
 }
 
 fn whitespace1<T, E: ParseError<T>>(input: T) -> IResult<T, T, E>
 where
     T: InputTakeAtPosition,
-    <T as InputTakeAtPosition>::Item: AsChar + Clone,
+    <T as InputTakeAtPosition>::Item: AsChar,
 {
-    input.split_at_position1_complete(
-        |item| {
-            let c = item.as_char();
-            match c {
-                ' ' | ',' | '\t' | '\r' | '\n' => false,
-                _ => true,
-            }
-        },
-        ErrorKind::Space,
-    )
+    input.split_at_position1_complete(|item| whitespacechar(item.as_char()), ErrorKind::Space)
 }
 
 fn read_float<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
@@ -105,13 +110,15 @@ fn read_atom<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, For
 
 fn read_list<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     let (input, _) = tag("(")(input)?;
+    let (input, _) = whitespace0(input)?;
     let (input, ret) = map(separated_list(whitespace1, read_form), Form::List)(input)?;
+    let (input, _) = whitespace0(input)?;
     let (input, _) = tag(")")(input)?;
     Ok((input, ret))
 }
 
 fn read_form<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
-    preceded(opt(whitespace1), alt((read_list, read_atom)))(input)
+    preceded(whitespace0, alt((read_list, read_atom)))(input)
 }
 
 pub fn read_str(input: &str) -> Result<Form, ()> {
