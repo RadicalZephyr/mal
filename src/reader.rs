@@ -2,7 +2,7 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     character::complete::{alpha1, alphanumeric1, anychar, char, digit1, not_line_ending},
-    combinator::{all_consuming, map, map_res, recognize, value},
+    combinator::{map, map_res, recognize, value},
     error::{ErrorKind, ParseError, VerboseError},
     multi::{many0, many_till, separated_list},
     sequence::{preceded, tuple},
@@ -90,8 +90,11 @@ fn read_form<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, For
 }
 
 pub fn read_str(input: &str) -> Result<Form, ()> {
-    match all_consuming(read_form::<VerboseError<&str>>)(input) {
+    match read_form::<VerboseError<&str>>(input) {
         Ok((_, form)) => Ok(form),
-        Err(_) => Err(()),
+        Err(e) => {
+            eprintln!("ERROR: {:?}", e);
+            Err(())
+        }
     }
 }
