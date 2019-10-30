@@ -3,20 +3,27 @@ use std::io;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
-fn read(s: String) -> String {
-    s
+use mal::{pr_str, read_str, Form};
+
+#[derive(Copy, Clone, Debug)]
+enum Error {
+    ReadError,
 }
 
-fn eval(s: String) -> String {
-    s
+fn read(s: &str) -> Result<Form, Error> {
+    read_str(s).map_err(|_| Error::ReadError)
 }
 
-fn print(s: String) -> String {
-    s
+fn eval(s: Form) -> Result<Form, Error> {
+    Ok(s)
 }
 
-fn rep(s: String) -> String {
-    print(eval(read(s)))
+fn print(s: Form) -> String {
+    pr_str(&s)
+}
+
+fn rep(s: String) -> Result<String, Error> {
+    Ok(print(eval(read(&s)?)?))
 }
 
 fn main() -> io::Result<()> {
@@ -32,7 +39,10 @@ fn main() -> io::Result<()> {
                 rl.add_history_entry(&line);
                 rl.save_history(".mal-history").ok();
                 if line.len() > 0 {
-                    println!("{}", rep(line));
+                    match rep(line) {
+                        Ok(output) => println!("{}", output),
+                        Err(e) => eprintln!("{:?}", e),
+                    }
                 }
             }
 

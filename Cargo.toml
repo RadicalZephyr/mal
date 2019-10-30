@@ -1,5 +1,5 @@
 [package]
-name = "rust3"
+name = "mal"
 version = "0.1.0"
 authors = ["Geoff Shannon <geoffpshannon@gmail.com>"]
 edition = "2018"
@@ -8,5 +8,6 @@ edition = "2018"
 
 [dependencies]
 nom = "5.0.1"
+num-bigint = "0.2"
 once_cell = "1.2.0"
 rustyline = "5.0.3"
