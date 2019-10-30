@@ -1,4 +1,7 @@
-use std::io::{self, BufRead, Write};
+use std::io;
+
+use rustyline::error::ReadlineError;
+use rustyline::Editor;
 
 fn read(s: String) -> String {
     s
@@ -17,21 +20,31 @@ fn rep(s: String) -> String {
 }
 
 fn main() -> io::Result<()> {
-    let mut buffer = String::new();
-
-    let stdin_handle = std::io::stdin();
-    let mut stdin = stdin_handle.lock();
-    let stdout_handle = std::io::stdout();
-    let mut stdout = stdout_handle.lock();
+    let mut rl = Editor::<()>::new();
+    if rl.load_history(".mal-history").is_err() {
+        eprintln!("No previous history.");
+    }
 
     loop {
-        write!(stdout, "user> ")?;
-        stdout.flush()?;
-        if 0 == stdin.read_line(&mut buffer)? {
-            writeln!(stdout, "\nBye!")?;
-            break Ok(());
+        let readline = rl.readline("user> ");
+        match readline {
+            Ok(line) => {
+                rl.add_history_entry(&line);
+                rl.save_history(".mal-history").ok();
+                if line.len() > 0 {
+                    println!("{}", rep(line));
+                }
+            }
+
+            Err(ReadlineError::Interrupted) => continue,
+            Err(ReadlineError::Eof) => break,
+            Err(err) => {
+                eprintln!("Error: {:?}", err);
+                break;
+            }
         }
-        write!(stdout, "{}", rep(buffer.clone()))?;
-        buffer.clear();
     }
+
+    eprintln!("\nBye!");
+    Ok(())
 }
