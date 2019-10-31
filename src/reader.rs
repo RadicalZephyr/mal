@@ -6,8 +6,8 @@ use nom::{
     character::complete::{char, digit0, digit1, not_line_ending},
     combinator::{map, map_res, opt, recognize, value},
     error::{ErrorKind, ParseError, VerboseError},
-    multi::separated_list,
-    sequence::{preceded, terminated, tuple},
+    multi::many0,
+    sequence::{pair, preceded, terminated, tuple},
     AsChar, FindSubstring, IResult, InputTakeAtPosition,
 };
 
@@ -138,12 +138,13 @@ fn read_atom<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, For
 }
 
 fn read_list<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
-    let (input, _) = tag("(")(input)?;
-    let (input, _) = whitespace0(input)?;
-    let (input, ret) = map(separated_list(whitespace1, read_form), Form::List)(input)?;
-    let (input, _) = whitespace0(input)?;
-    let (input, _) = tag(")")(input)?;
-    Ok((input, ret))
+    preceded(
+        pair(whitespace0, tag("(")),
+        terminated(
+            map(many0(read_form), Form::List),
+            tuple((whitespace0, tag(")"))),
+        ),
+    )(input)
 }
 
 fn read_form<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
