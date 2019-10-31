@@ -15,7 +15,7 @@ impl fmt::Display for Atom {
             Float(value) => value.fmt(f),
             Integer(value) => value.fmt(f),
             Symbol(name) | Keyword(name) => f.write_str(&name),
-            String(contents) => write!(f, r#""{}""#, contents),
+            String(contents) => write!(f, "\"{}\"", contents),
             Nil => f.write_str("nil"),
         }
     }

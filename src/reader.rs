@@ -3,12 +3,12 @@ use std::str::FromStr;
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{anychar, char, digit0, digit1, not_line_ending},
+    character::complete::{char, digit0, digit1, not_line_ending},
     combinator::{map, map_res, opt, recognize, value},
     error::{ErrorKind, ParseError, VerboseError},
-    multi::{many_till, separated_list},
-    sequence::{preceded, tuple},
-    AsChar, IResult, InputTakeAtPosition,
+    multi::separated_list,
+    sequence::{preceded, terminated, tuple},
+    AsChar, FindSubstring, IResult, InputTakeAtPosition,
 };
 
 use rug::{Float, Integer};
@@ -19,6 +19,18 @@ use crate::{Atom, Bool, Form};
 
 fn comment<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
     preceded(tag(";;"), not_line_ending)(input)
+}
+
+fn stringchar0<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
+    let bytes = input.as_bytes();
+    let mut search_index = 0;
+    while let Some(index) = (&bytes[search_index..]).find_substring("\"") {
+        search_index = index;
+        if b'\\' != bytes[index - 1] {
+            break;
+        }
+    }
+    Ok((&input[search_index..], &input[..search_index]))
 }
 
 fn symbolchar(c: char) -> bool {
@@ -84,11 +96,9 @@ fn read_nil<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom
 }
 
 fn read_string<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
-    preceded(
-        char('"'),
-        map(recognize(many_till(anychar, char('"'))), |s: &str| {
-            Atom::Symbol(s.to_string())
-        }),
+    map(
+        preceded(char('"'), terminated(stringchar0, char('"'))),
+        |s: &str| Atom::String(s.to_string()),
     )(input)
 }
 
