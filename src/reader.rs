@@ -17,6 +17,7 @@ use crate::{Atom, Bool, Form};
 
 // -------------------- Utility Functions --------------------
 
+#[allow(dead_code)]
 fn comment<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
     preceded(tag(";;"), not_line_ending)(input)
 }
@@ -42,6 +43,15 @@ fn symbolchar(c: char) -> bool {
     }
 }
 
+#[allow(dead_code)]
+fn symbolchar0<T, E: ParseError<T>>(input: T) -> IResult<T, T, E>
+where
+    T: InputTakeAtPosition,
+    <T as InputTakeAtPosition>::Item: AsChar,
+{
+    input.split_at_position_complete(|item| symbolchar(item.as_char()))
+}
+
 fn symbolchar1<T, E: ParseError<T>>(input: T) -> IResult<T, T, E>
 where
     T: InputTakeAtPosition,
@@ -65,6 +75,7 @@ where
     input.split_at_position_complete(|item| whitespacechar(item.as_char()))
 }
 
+#[allow(dead_code)]
 fn whitespace1<T, E: ParseError<T>>(input: T) -> IResult<T, T, E>
 where
     T: InputTakeAtPosition,
