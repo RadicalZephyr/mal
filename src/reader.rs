@@ -256,4 +256,16 @@ mod tests {
             );
         }
     }
+
+    mod string_contents {
+        use super::*;
+
+        #[test]
+        fn test_escaped_quote() {
+            assert_eq!(
+                string_contents::<VerboseError<&str>>(r#"abc\"def""#),
+                Ok(("\"", r#"abc"def"#.to_string()))
+            );
+        }
+    }
 }
