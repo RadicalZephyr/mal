@@ -110,11 +110,15 @@ fn read_nil<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom
 fn string_escapes<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
     context(
         "string_escapes",
-        map(alt((tag("\\\\"), tag("\\n"))), |s: &str| match s {
-            "\\\\" => "\\",
-            "\\n" => "\n",
-            _ => unreachable!(),
-        }),
+        map(
+            alt((tag(r#"\""#), tag(r"\\"), tag(r"\n"))),
+            |s: &str| match s {
+                r#"\""# => r#"""#,
+                r"\\" => r"\",
+                r"\n" => "\n",
+                _ => unreachable!(),
+            },
+        ),
     )(input)
 }
 
@@ -206,6 +210,50 @@ pub fn read_str(input: &str) -> Result<Form, ()> {
         Err(Err::Error(e)) | Err(Err::Failure(e)) => {
             eprintln!("ERROR: {}", convert_error(input, e));
             Err(())
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod stringchar0 {
+        use super::*;
+
+        #[test]
+        fn test_empty_ended_by_backlash() {
+            assert_eq!(stringchar0::<VerboseError<&str>>("\\"), Ok(("\\", "")));
+        }
+
+        #[test]
+        fn test_ended_by_backlash() {
+            assert_eq!(
+                stringchar0::<VerboseError<&str>>(" a1-\\"),
+                Ok(("\\", " a1-")),
+            );
+        }
+    }
+
+    mod string_escapes {
+        use super::*;
+
+        #[test]
+        fn test_backslash() {
+            assert_eq!(string_escapes::<VerboseError<&str>>(r"\\"), Ok(("", r"\")));
+        }
+
+        #[test]
+        fn test_newline() {
+            assert_eq!(string_escapes::<VerboseError<&str>>(r"\n"), Ok(("", "\n")));
+        }
+
+        #[test]
+        fn test_quote() {
+            assert_eq!(
+                string_escapes::<VerboseError<&str>>(r#"\""#),
+                Ok(("", r#"""#))
+            );
         }
     }
 }
