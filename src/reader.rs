@@ -4,11 +4,11 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     character::complete::{char, digit0, digit1, not_line_ending},
-    combinator::{map, map_res, opt, recognize, value},
-    error::{convert_error, ErrorKind, ParseError, VerboseError},
-    multi::many0,
+    combinator::{map, map_res, opt, peek, recognize, value},
+    error::{convert_error, make_error, ErrorKind, ParseError, VerboseError},
+    multi::{many0, many_till},
     sequence::{pair, preceded, terminated, tuple},
-    AsChar, Err, FindSubstring, IResult, InputTakeAtPosition,
+    AsChar, Err, IResult, InputIter, InputTakeAtPosition,
 };
 
 use rug::{Float, Integer};
@@ -23,25 +23,10 @@ fn comment<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a s
 }
 
 fn stringchar0<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
-    let bytes = input.as_bytes();
-    let mut search_index = 0;
-
-    while let Some(index) = (&bytes[search_index..]).find_substring("\"") {
-        search_index += index;
-        let prev_index = if search_index == 0 {
-            0
-        } else {
-            search_index - 1
-        };
-        if b'\\' == bytes[prev_index] {
-            // Skip escaped double quotations
-            search_index += 1;
-        } else {
-            break;
-        }
+    match input.position(|item| item == '\\' || item == '"') {
+        None => Err(Err::Error(make_error(input, ErrorKind::RegexpFind))),
+        Some(index) => Ok((&input[index..], &input[..index])),
     }
-
-    Ok((&input[search_index..], &input[..search_index]))
 }
 
 fn symbolchar(c: char) -> bool {
@@ -116,10 +101,25 @@ fn read_nil<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom
     value(Atom::Nil, tag("nil"))(input)
 }
 
+fn string_escapes<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
+    map(alt((tag("\\\\"), tag("\\n"))), |s: &str| match s {
+        "\\\\" => "\\",
+        "\\n" => "\n",
+        _ => unreachable!(),
+    })(input)
+}
+
+fn string_contents<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, String, E> {
+    map(
+        many_till(alt((string_escapes, stringchar0)), peek(char('"'))),
+        |(xs, _)| xs.concat(),
+    )(input)
+}
+
 fn read_string<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
     map(
-        preceded(char('"'), terminated(stringchar0, char('"'))),
-        |s: &str| Atom::String(s.to_string()),
+        preceded(char('"'), terminated(string_contents, char('"'))),
+        Atom::String,
     )(input)
 }
 
@@ -180,7 +180,7 @@ pub fn read_str(input: &str) -> Result<Form, ()> {
             Err(())
         }
         Err(Err::Error(e)) | Err(Err::Failure(e)) => {
-            eprintln!("ERROR: {:?}", convert_error(input, e));
+            eprintln!("ERROR: {}", convert_error(input, e));
             Err(())
         }
     }

@@ -1,4 +1,4 @@
-use rug::{Float, Integer};
+pub use rug::{Float, Integer};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Bool {

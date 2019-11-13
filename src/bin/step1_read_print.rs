@@ -19,7 +19,7 @@ fn eval(s: Form) -> Result<Form, Error> {
 }
 
 fn print(s: Form) -> String {
-    pr_str(&s)
+    pr_str(&s, true)
 }
 
 fn rep(s: String) -> Result<String, Error> {
