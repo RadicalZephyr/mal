@@ -1,4 +1,8 @@
-use std::fmt;
+use std::{borrow::Cow, fmt};
+
+use once_cell::unsync::Lazy;
+
+use regex::{Captures, Regex};
 
 use crate::{Atom, Bool, Float, Form, Integer};
 
@@ -10,6 +14,24 @@ trait Printable {
     fn pr(&self, options: &Options, f: &mut fmt::Formatter) -> fmt::Result;
 }
 
+fn print_string<'a>(s: &'a str) -> Cow<'a, str> {
+    let re: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(
+            r#"("|\\|
+)"#,
+        )
+        .unwrap()
+    });
+    re.replace_all(s, |captures: &Captures| {
+        match captures.get(0).unwrap().as_str() {
+            "\"" => r#"\""#,
+            "\\" => r"\\",
+            "\n" => r"\n",
+            _ => unreachable!(),
+        }
+    })
+}
+
 impl Printable for Atom {
     fn pr(&self, options: &Options, f: &mut fmt::Formatter) -> fmt::Result {
         use crate::Atom::*;
@@ -19,7 +41,7 @@ impl Printable for Atom {
             Float(value) => value.pr(options, f),
             Integer(value) => value.pr(options, f),
             Symbol(name) | Keyword(name) => f.write_str(&name),
-            String(contents) => write!(f, "\"{}\"", contents),
+            String(contents) => write!(f, "\"{}\"", print_string(contents)),
             Nil => f.write_str("nil"),
         }
     }
