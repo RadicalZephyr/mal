@@ -163,7 +163,7 @@ fn read_list<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, For
         pair(whitespace0, tag("(")),
         terminated(
             map(many0(read_form), Form::List),
-            tuple((whitespace0, tag(")"))),
+            pair(whitespace0, tag(")")),
         ),
     )(input)
 }
