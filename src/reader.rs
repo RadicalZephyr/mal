@@ -5,10 +5,10 @@ use nom::{
     bytes::complete::tag,
     character::complete::{char, digit0, digit1, not_line_ending},
     combinator::{map, map_res, opt, recognize, value},
-    error::{ErrorKind, ParseError, VerboseError},
+    error::{convert_error, ErrorKind, ParseError, VerboseError},
     multi::many0,
     sequence::{pair, preceded, terminated, tuple},
-    AsChar, FindSubstring, IResult, InputTakeAtPosition,
+    AsChar, Err, FindSubstring, IResult, InputTakeAtPosition,
 };
 
 use rug::{Float, Integer};
@@ -25,12 +25,22 @@ fn comment<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a s
 fn stringchar0<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
     let bytes = input.as_bytes();
     let mut search_index = 0;
+
     while let Some(index) = (&bytes[search_index..]).find_substring("\"") {
-        search_index = index;
-        if b'\\' != bytes[index - 1] {
+        search_index += index;
+        let prev_index = if search_index == 0 {
+            0
+        } else {
+            search_index - 1
+        };
+        if b'\\' == bytes[prev_index] {
+            // Skip escaped double quotations
+            search_index += 1;
+        } else {
             break;
         }
     }
+
     Ok((&input[search_index..], &input[..search_index]))
 }
 
@@ -165,8 +175,12 @@ fn read_form<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, For
 pub fn read_str(input: &str) -> Result<Form, ()> {
     match read_form::<VerboseError<&str>>(input) {
         Ok((_, form)) => Ok(form),
-        Err(e) => {
-            eprintln!("ERROR: {:?}", e);
+        Err(Err::Incomplete(x)) => {
+            eprintln!("INCOMPLETE parse: {:?}", x);
+            Err(())
+        }
+        Err(Err::Error(e)) | Err(Err::Failure(e)) => {
+            eprintln!("ERROR: {:?}", convert_error(input, e));
             Err(())
         }
     }
