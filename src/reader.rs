@@ -5,7 +5,7 @@ use nom::{
     bytes::complete::tag,
     character::complete::{char, digit0, digit1, not_line_ending},
     combinator::{map, map_res, opt, peek, recognize, value},
-    error::{convert_error, make_error, ErrorKind, ParseError, VerboseError},
+    error::{context, convert_error, make_error, ErrorKind, ParseError, VerboseError},
     multi::{many0, many_till},
     sequence::{pair, preceded, terminated, tuple},
     AsChar, Err, IResult, InputIter, InputTakeAtPosition,
@@ -19,7 +19,7 @@ use crate::{Atom, Bool, Form};
 
 #[allow(dead_code)]
 fn comment<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
-    preceded(tag(";;"), not_line_ending)(input)
+    context("comment", preceded(tag(";;"), not_line_ending))(input)
 }
 
 fn stringchar0<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
@@ -82,19 +82,25 @@ where
 // -------------------- Atom Readers --------------------
 
 fn read_float<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
-    map_res(
-        recognize(tuple((read_integer, char('.'), digit0))),
-        |s: &'a str| {
-            s.parse::<f64>()
-                .map(|v| Atom::Float(Float::with_val(12, v)))
-        },
+    context(
+        "read_float",
+        map_res(
+            recognize(tuple((read_integer, char('.'), digit0))),
+            |s: &'a str| {
+                s.parse::<f64>()
+                    .map(|v| Atom::Float(Float::with_val(12, v)))
+            },
+        ),
     )(input)
 }
 
 fn read_integer<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
-    map_res(recognize(preceded(opt(char('-')), digit1)), |s: &str| {
-        s.parse::<Integer>().map(Atom::Integer)
-    })(input)
+    context(
+        "read_integer",
+        map_res(recognize(preceded(opt(char('-')), digit1)), |s: &str| {
+            s.parse::<Integer>().map(Atom::Integer)
+        }),
+    )(input)
 }
 
 fn read_nil<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
@@ -102,24 +108,33 @@ fn read_nil<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom
 }
 
 fn string_escapes<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
-    map(alt((tag("\\\\"), tag("\\n"))), |s: &str| match s {
-        "\\\\" => "\\",
-        "\\n" => "\n",
-        _ => unreachable!(),
-    })(input)
+    context(
+        "string_escapes",
+        map(alt((tag("\\\\"), tag("\\n"))), |s: &str| match s {
+            "\\\\" => "\\",
+            "\\n" => "\n",
+            _ => unreachable!(),
+        }),
+    )(input)
 }
 
 fn string_contents<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, String, E> {
-    map(
-        many_till(alt((string_escapes, stringchar0)), peek(char('"'))),
-        |(xs, _)| xs.concat(),
+    context(
+        "string_contents",
+        map(
+            many_till(alt((string_escapes, stringchar0)), peek(char('"'))),
+            |(xs, _)| xs.concat(),
+        ),
     )(input)
 }
 
 fn read_string<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
-    map(
-        preceded(char('"'), terminated(string_contents, char('"'))),
-        Atom::String,
+    context(
+        "read_string",
+        map(
+            preceded(char('"'), terminated(string_contents, char('"'))),
+            Atom::String,
+        ),
     )(input)
 }
 
@@ -138,7 +153,7 @@ impl FromStr for Bool {
 }
 
 fn read_symbol<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom, E> {
-    let (input, symbolname) = symbolchar1(input)?;
+    let (input, symbolname) = context("read_symbol", symbolchar1)(input)?;
     if let Ok(boolean) = symbolname.parse::<Bool>() {
         return Ok((input, Atom::Bool(boolean)));
     }
@@ -152,24 +167,33 @@ fn read_symbol<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, A
 // -------------------- Form Readers --------------------
 
 fn read_atom<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
-    map(
-        alt((read_float, read_integer, read_string, read_nil, read_symbol)),
-        Form::Atom,
+    context(
+        "read_atom",
+        map(
+            alt((read_float, read_integer, read_string, read_nil, read_symbol)),
+            Form::Atom,
+        ),
     )(input)
 }
 
 fn read_list<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
-    preceded(
-        pair(whitespace0, tag("(")),
-        terminated(
-            map(many0(read_form), Form::List),
-            pair(whitespace0, tag(")")),
+    context(
+        "read_list",
+        preceded(
+            pair(whitespace0, tag("(")),
+            terminated(
+                map(many0(read_form), Form::List),
+                pair(whitespace0, tag(")")),
+            ),
         ),
     )(input)
 }
 
 fn read_form<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
-    preceded(whitespace0, alt((read_list, read_atom)))(input)
+    context(
+        "read_form",
+        preceded(whitespace0, alt((read_list, read_atom))),
+    )(input)
 }
 
 pub fn read_str(input: &str) -> Result<Form, ()> {
