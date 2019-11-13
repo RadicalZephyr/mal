@@ -70,19 +70,31 @@ impl Printable for Float {
     }
 }
 
+impl Printable for &Vec<Form> {
+    fn pr(&self, options: &Options, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut sep = "";
+        for form in *self {
+            f.write_str(sep)?;
+            form.pr(options, f)?;
+            sep = " ";
+        }
+        Ok(())
+    }
+}
+
 impl Printable for Form {
     fn pr(&self, options: &Options, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Form::Atom(atom) => atom.pr(options, f),
             Form::List(forms) => {
-                let mut sep = "";
                 f.write_str("(")?;
-                for form in forms {
-                    f.write_str(sep)?;
-                    form.pr(options, f)?;
-                    sep = " ";
-                }
+                forms.pr(options, f)?;
                 f.write_str(")")
+            }
+            Form::Vector(forms) => {
+                f.write_str("[")?;
+                forms.pr(options, f)?;
+                f.write_str("]")
             }
         }
     }

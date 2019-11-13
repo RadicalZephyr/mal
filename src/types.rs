@@ -21,4 +21,5 @@ pub enum Atom {
 pub enum Form {
     Atom(Atom),
     List(Vec<Form>),
+    Vector(Vec<Form>),
 }

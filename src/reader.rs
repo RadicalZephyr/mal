@@ -193,10 +193,23 @@ fn read_list<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, For
     )(input)
 }
 
+fn read_vector<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
+    context(
+        "read_vector",
+        preceded(
+            pair(whitespace0, tag("[")),
+            terminated(
+                map(many0(read_form), Form::Vector),
+                pair(whitespace0, tag("]")),
+            ),
+        ),
+    )(input)
+}
+
 fn read_form<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     context(
         "read_form",
-        preceded(whitespace0, alt((read_list, read_atom))),
+        preceded(whitespace0, alt((read_list, read_vector, read_atom))),
     )(input)
 }
 
