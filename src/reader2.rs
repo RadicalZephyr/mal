@@ -3,7 +3,7 @@ use nom::{
     bytes::complete::tag,
     character::complete::{char, not_line_ending},
     combinator::{cut, map, opt, value},
-    error::{context, ErrorKind as NomErrorKind, ParseError, VerboseError},
+    error::{context, ErrorKind as NomErrorKind, ParseError, VerboseError, VerboseErrorKind},
     multi::many_till,
     sequence::{preceded, tuple},
     AsChar, Err, IResult, InputTakeAtPosition,
@@ -13,19 +13,19 @@ use crate::{Comment, Form};
 
 trait ParseErrorExt<I>: ParseError<I> {
     #[allow(unused_variables)]
-    fn add_kind(kind: ErrorKind, other: Self) -> Self {
+    fn add_kind(i: I, context: &'static str, kind: ErrorKind, other: Self) -> Self {
         other
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Error<'a> {
-    error: VerboseError<&'a str>,
+pub struct Error<I> {
+    error: VerboseError<I>,
     kind: ErrorKind,
 }
 
-impl<'a> Error<'a> {
-    fn from_kind(input: &'a str, kind: ErrorKind) -> Self {
+impl<I> Error<I> {
+    fn from_kind(input: I, kind: ErrorKind) -> Self {
         Error {
             error: VerboseError::from_error_kind(input, NomErrorKind::Eof),
             kind,
@@ -33,15 +33,15 @@ impl<'a> Error<'a> {
     }
 }
 
-impl<'a> ParseError<&'a str> for Error<'a> {
-    fn from_error_kind(input: &'a str, kind: NomErrorKind) -> Self {
+impl<I> ParseError<I> for Error<I> {
+    fn from_error_kind(input: I, kind: NomErrorKind) -> Self {
         Error {
             error: VerboseError::from_error_kind(input, kind),
             kind: ErrorKind::Bad,
         }
     }
 
-    fn append(input: &'a str, nom_kind: NomErrorKind, other: Self) -> Self {
+    fn append(input: I, nom_kind: NomErrorKind, other: Self) -> Self {
         let Error { error, kind } = other;
         Error {
             error: VerboseError::append(input, nom_kind, error),
@@ -50,29 +50,40 @@ impl<'a> ParseError<&'a str> for Error<'a> {
     }
 }
 
-impl<'a, I> ParseErrorExt<I> for Error<'a>
+impl<I> ParseErrorExt<I> for Error<I>
 where
-    Error<'a>: ParseError<I>,
+    Error<I>: ParseError<I>,
 {
-    fn add_kind(kind: ErrorKind, mut other: Self) -> Self {
+    fn add_kind(input: I, context: &'static str, kind: ErrorKind, mut other: Self) -> Self {
+        other
+            .error
+            .errors
+            .push((input, VerboseErrorKind::Context(context)));
         other.kind = kind;
         other
     }
 }
 
 fn with_kind<I: Clone, E: ParseErrorExt<I>, F, O>(
+    context: &'static str,
     kind: ErrorKind,
     f: F,
 ) -> impl Fn(I) -> IResult<I, O, E>
 where
     F: Fn(I) -> IResult<I, O, E>,
 {
-    move |i: I| match f(i) {
+    move |i: I| match f(i.clone()) {
         Ok(o) => Ok(o),
         Err(Err::Incomplete(i)) => Err(Err::Incomplete(i)),
-        Err(Err::Error(e)) => Err(Err::Error(E::add_kind(kind, e))),
-        Err(Err::Failure(e)) => Err(Err::Failure(E::add_kind(kind, e))),
+        Err(Err::Error(e)) => Err(Err::Error(E::add_kind(i, context, kind, e))),
+        Err(Err::Failure(e)) => Err(Err::Failure(E::add_kind(i, context, kind, e))),
     }
+}
+
+macro_rules! with_kind {
+    ($kind:expr, $f:expr $(,)?) => {{
+        with_kind(stringify!($kind), $kind, $f)
+    }};
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -127,12 +138,14 @@ fn read_comment<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a st
 }
 
 fn read_list<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
-    let (input, _) = char('(')(input)?;
     context(
         "read_list",
-        with_kind(
+        with_kind!(
             ErrorKind::UnterminatedList,
-            map(cut(many_till(read_form, char(')'))), |(f, _)| Form::list(f)),
+            map(
+                preceded(char('('), cut(many_till(read_form, char(')')))),
+                |(f, _)| Form::list(f)
+            ),
         ),
     )(input)
 }
@@ -158,8 +171,8 @@ fn opt_read_form<'a, E: ParseErrorExt<&'a str>>(
     opt(read_form)(input)
 }
 
-pub fn read_str2(input: &str) -> Result<Option<Form>, Error> {
-    match opt_read_form::<self::Error>(input) {
+pub fn read_str2<'a>(input: &'a str) -> Result<Option<Form>, Error<&'a str>> {
+    match opt_read_form::<self::Error<&'a str>>(input) {
         Ok((_, form)) => Ok(form),
         Err(e) => match e {
             Err::Incomplete(_i) => Err(self::Error::from_kind(input, ErrorKind::Bad)),
@@ -225,7 +238,7 @@ mod tests {
 
             use nom::error::{
                 ErrorKind::{Alt, ManyTill, Tag},
-                VerboseErrorKind::Nom,
+                VerboseErrorKind::{Context, Nom},
             };
 
             #[test]
@@ -255,7 +268,12 @@ mod tests {
                     read_str2("(nil true"),
                     Err(Error {
                         error: VerboseError {
-                            errors: vec![("", Nom(Tag)), ("", Nom(Alt)), ("", Nom(ManyTill))]
+                            errors: vec![
+                                ("", Nom(Tag)),
+                                ("", Nom(Alt)),
+                                ("", Nom(ManyTill)),
+                                ("(nil true", Context("ErrorKind::UnterminatedList"))
+                            ]
                         },
                         kind: ErrorKind::UnterminatedList,
                     })
