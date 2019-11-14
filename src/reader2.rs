@@ -4,7 +4,7 @@ use nom::{
     character::complete::not_line_ending,
     combinator::{map, opt, value},
     error::{context, ParseError, VerboseError},
-    sequence::preceded,
+    sequence::{preceded, tuple},
     AsChar, IResult, InputTakeAtPosition,
 };
 
@@ -29,24 +29,43 @@ where
 {
     input.split_at_position_complete(|item| whitespacechar(item.as_char()))
 }
-
-fn read_comment<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
+fn read_form_comment<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Comment, E> {
     context(
-        "comment",
+        "form_comment",
+        map(
+            preceded(tuple((tag("#_"), whitespace0)), read_form),
+            |form: Form| Comment::Form(Box::new(form)),
+        ),
+    )(input)
+}
+
+fn read_line_comment<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Comment, E> {
+    context(
+        "line_comment",
         map(preceded(tag(";"), not_line_ending), |s: &'a str| {
-            Form::Comment(Comment::Line(String::from(s)))
+            Comment::Line(String::from(s))
         }),
     )(input)
 }
 
+fn read_comment<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
+    context(
+        "read_comment",
+        map(alt((read_form_comment, read_line_comment)), Form::Comment),
+    )(input)
+}
+
 fn read_form<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
-    preceded(
-        whitespace0,
-        alt((
-            read_comment,
-            value(Form::nil(), tag("nil")),
-            value(Form::_true(), tag("true")),
-        )),
+    context(
+        "read_form",
+        preceded(
+            whitespace0,
+            alt((
+                read_comment,
+                value(Form::nil(), tag("nil")),
+                value(Form::_true(), tag("true")),
+            )),
+        ),
     )(input)
 }
 
@@ -85,6 +104,14 @@ mod tests {
                 read_str2("; Comment"),
                 Ok(Some(Form::Comment(Comment::Line(" Comment".into()))))
             );
+        }
+
+        #[test]
+        fn form() {
+            assert_eq!(
+                read_str2("#_nil"),
+                Ok(Some(Form::Comment(Comment::Form(Box::new(Form::nil())))))
+            )
         }
     }
 
