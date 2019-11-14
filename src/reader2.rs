@@ -159,6 +159,14 @@ mod tests {
                     Ok(Some(Form::list(std::iter::once(Form::nil()))))
                 );
             }
+
+            #[test]
+            fn n_element() {
+                assert_eq!(
+                    read_str2("(true nil)"),
+                    Ok(Some(Form::list(vec![Form::_true(), Form::nil()])))
+                )
+            }
         }
     }
 }
