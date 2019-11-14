@@ -1,3 +1,5 @@
+use derive_more::Display;
+
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -16,6 +18,21 @@ trait ParseErrorExt<I>: ParseError<I> {
     fn add_kind(i: I, context: &'static str, kind: ErrorKind, other: Self) -> Self {
         other
     }
+}
+
+#[allow(dead_code)]
+#[derive(Copy, Clone, Debug, Display, PartialEq)]
+pub enum ErrorKind {
+    Bad,
+
+    #[display(fmt = "this file contains an un-closed delimiter: `{}`", _0)]
+    UnclosedDelimiter(char),
+
+    #[display(fmt = "incorrect close delimiter: `{}`", _0)]
+    IncorrectCloseDelimiter(char),
+
+    #[display(fmt = "unexpected close delimiter: `{}`", _0)]
+    UnexpectedCloseDelimiter(char),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -86,12 +103,6 @@ macro_rules! with_kind {
     }};
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum ErrorKind {
-    Bad,
-    UnterminatedList,
-}
-
 fn whitespacechar(c: char) -> bool {
     match c {
         ' ' | ',' | '\t' | '\r' | '\n' => false,
@@ -141,7 +152,7 @@ fn read_list<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, 
     context(
         "read_list",
         with_kind!(
-            ErrorKind::UnterminatedList,
+            ErrorKind::UnclosedDelimiter(')'),
             map(
                 preceded(char('('), cut(many_till(read_form, char(')')))),
                 |(f, _)| Form::list(f)
@@ -272,10 +283,10 @@ mod tests {
                                 ("", Nom(Tag)),
                                 ("", Nom(Alt)),
                                 ("", Nom(ManyTill)),
-                                ("(nil true", Context("ErrorKind::UnterminatedList"))
+                                ("(nil true", Context("ErrorKind::UnclosedDelimiter(\')\')"))
                             ]
                         },
-                        kind: ErrorKind::UnterminatedList,
+                        kind: ErrorKind::UnclosedDelimiter(')'),
                     })
                 )
             }
