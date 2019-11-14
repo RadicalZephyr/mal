@@ -163,7 +163,7 @@ impl Form {
         Form::List(List::new())
     }
 
-    pub fn list(forms: Vec<Form>) -> Form {
+    pub fn list<F: IntoIterator<Item = Form>>(forms: F) -> Form {
         Form::List(forms.into_iter().collect())
     }
 

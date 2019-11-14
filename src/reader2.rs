@@ -4,6 +4,7 @@ use nom::{
     character::complete::{char, not_line_ending},
     combinator::{map, opt, value},
     error::{context, ParseError, VerboseError},
+    multi::many_till,
     sequence::{preceded, tuple},
     AsChar, IResult, InputTakeAtPosition,
 };
@@ -58,7 +59,10 @@ fn read_comment<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, 
 fn read_list<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     context(
         "read_list",
-        map(preceded(char('('), char(')')), |_| Form::list(Vec::new())),
+        map(
+            preceded(char('('), many_till(read_form, char(')'))),
+            |(f, _)| Form::list(f),
+        ),
     )(input)
 }
 
@@ -140,9 +144,21 @@ mod tests {
     mod compound {
         use super::*;
 
-        #[test]
-        fn list() {
-            assert_eq!(read_str2("()"), Ok(Some(Form::empty_list())));
+        mod list {
+            use super::*;
+
+            #[test]
+            fn empty() {
+                assert_eq!(read_str2("()"), Ok(Some(Form::empty_list())));
+            }
+
+            #[test]
+            fn one_element() {
+                assert_eq!(
+                    read_str2("(nil)"),
+                    Ok(Some(Form::list(std::iter::once(Form::nil()))))
+                );
+            }
         }
     }
 }
