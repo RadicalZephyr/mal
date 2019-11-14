@@ -159,6 +159,14 @@ pub enum Form {
 }
 
 impl Form {
+    pub fn empty_list() -> Form {
+        Form::List(List::new())
+    }
+
+    pub fn list(forms: Vec<Form>) -> Form {
+        Form::List(forms.into_iter().collect())
+    }
+
     pub fn nil() -> Form {
         Form::Atom(Atom::Nil)
     }

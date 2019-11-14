@@ -1,7 +1,7 @@
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::not_line_ending,
+    character::complete::{char, not_line_ending},
     combinator::{map, opt, value},
     error::{context, ParseError, VerboseError},
     sequence::{preceded, tuple},
@@ -55,6 +55,13 @@ fn read_comment<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, 
     )(input)
 }
 
+fn read_list<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
+    context(
+        "read_list",
+        map(preceded(char('('), char(')')), |_| Form::list(Vec::new())),
+    )(input)
+}
+
 fn read_form<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     context(
         "read_form",
@@ -62,6 +69,7 @@ fn read_form<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, For
             whitespace0,
             alt((
                 read_comment,
+                read_list,
                 value(Form::nil(), tag("nil")),
                 value(Form::_true(), tag("true")),
             )),
@@ -126,6 +134,15 @@ mod tests {
         #[test]
         fn _true() {
             assert_eq!(read_str2("true"), Ok(Some(Form::_true())));
+        }
+    }
+
+    mod compound {
+        use super::*;
+
+        #[test]
+        fn list() {
+            assert_eq!(read_str2("()"), Ok(Some(Form::empty_list())));
         }
     }
 }
