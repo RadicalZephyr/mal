@@ -164,7 +164,10 @@ fn read_list<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, 
 fn read_map<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     context(
         "read_map",
-        value(Form::map(Vec::new()), pair(tag("{"), tag("}"))),
+        map(
+            preceded(char('{'), many_till(pair(read_form, read_form), char('}'))),
+            |(kvs, _)| Form::map(kvs),
+        ),
     )(input)
 }
 
@@ -305,7 +308,26 @@ mod tests {
 
             #[test]
             fn empty() {
-                assert_eq!(read_str2("{}"), Ok(Some(Form::map(Vec::new()))));
+                assert_eq!(read_str2("{}"), Ok(Some(Form::empty_map())));
+            }
+
+            #[test]
+            fn one_kv() {
+                assert_eq!(
+                    read_str2("{true nil}"),
+                    Ok(Some(Form::map(vec![(Form::_true(), Form::nil())])))
+                );
+            }
+
+            #[test]
+            fn n_kv() {
+                assert_eq!(
+                    read_str2("{true nil, nil true}"),
+                    Ok(Some(Form::map(vec![
+                        (Form::_true(), Form::nil()),
+                        (Form::nil(), Form::_true())
+                    ])))
+                );
             }
         }
     }

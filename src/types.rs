@@ -177,6 +177,10 @@ impl Form {
         Form::List(List::new())
     }
 
+    pub fn empty_map() -> Form {
+        Form::Map(Map::new())
+    }
+
     pub fn list<F: IntoIterator<Item = Form>>(forms: F) -> Form {
         Form::List(forms.into_iter().collect())
     }
