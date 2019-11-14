@@ -1,10 +1,16 @@
-use std::{borrow::Cow, fmt};
+use std::{
+    borrow::Cow,
+    fmt,
+    hash::{BuildHasher, Hash},
+};
+
+use archery::SharedPointerKind;
 
 use once_cell::unsync::Lazy;
 
 use regex::{Captures, Regex};
 
-use crate::{Atom, Bool, Float, Form, Integer, List, Vector};
+use crate::{Atom, Bool, Float, Form, Integer, List, Map, Vector};
 
 pub struct Options {
     pub print_readably: bool,
@@ -89,6 +95,26 @@ impl Printable for List<Form> {
     }
 }
 
+impl<K, V, P, H> Printable for Map<K, V, P, H>
+where
+    K: Hash + Eq + Printable,
+    V: Printable,
+    P: SharedPointerKind,
+    H: BuildHasher + Clone + Default,
+{
+    fn pr(&self, options: &Options, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut sep = "";
+        for (k, v) in self {
+            f.write_str(sep)?;
+            k.pr(options, f)?;
+            f.write_str(" ")?;
+            v.pr(options, f)?;
+            sep = " ";
+        }
+        Ok(())
+    }
+}
+
 impl Printable for Vector<Form> {
     fn pr(&self, options: &Options, f: &mut fmt::Formatter) -> fmt::Result {
         print_items(self, options, f)
@@ -103,6 +129,11 @@ impl Printable for Form {
                 f.write_str("(")?;
                 forms.pr(options, f)?;
                 f.write_str(")")
+            }
+            Form::Map(map) => {
+                f.write_str("{")?;
+                map.pr(options, f)?;
+                f.write_str("}")
             }
             Form::Vector(forms) => {
                 f.write_str("[")?;

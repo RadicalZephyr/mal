@@ -13,7 +13,7 @@ use nom::{
 
 use rug::Float as RugFloat;
 
-use crate::{Atom, Bool, Form, Integer};
+use crate::{Atom, Bool, Form, Integer, Map};
 
 // -------------------- Utility Functions --------------------
 
@@ -199,6 +199,35 @@ fn read_list<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, For
     )(input)
 }
 
+fn collect_map(
+    (acc, key): (Map<Form, Form>, Option<Form>),
+    next: Form,
+) -> (Map<Form, Form>, Option<Form>) {
+    match key {
+        Some(key) => (acc.insert(key, next), None),
+        None => (acc, Some(next)),
+    }
+}
+
+fn read_map<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
+    context(
+        "read_map",
+        preceded(
+            pair(whitespace0, tag("{")),
+            terminated(
+                map_res(many0(read_form), |forms: Vec<_>| {
+                    let (map, last) = forms.into_iter().fold((Map::new(), None), collect_map);
+                    if let Some(_) = last {
+                        return Err(Error::UnevenCountMapLiteral);
+                    }
+                    Ok(Form::Map(map.into()))
+                }),
+                pair(whitespace0, tag("}")),
+            ),
+        ),
+    )(input)
+}
+
 fn read_vector<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     context(
         "read_vector",
@@ -217,7 +246,10 @@ fn read_vector<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, F
 fn read_form<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     context(
         "read_form",
-        preceded(whitespace0, alt((read_list, read_vector, read_atom))),
+        preceded(
+            whitespace0,
+            alt((read_list, read_map, read_vector, read_atom)),
+        ),
     )(input)
 }
 

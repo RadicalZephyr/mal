@@ -5,4 +5,4 @@ mod reader;
 pub use reader::{read_str, Error as ReaderError};
 
 mod types;
-pub use types::{Atom, Bool, Float, Form, Integer, List, Vector};
+pub use types::{Atom, Bool, Float, Form, Integer, List, Map, Vector};
