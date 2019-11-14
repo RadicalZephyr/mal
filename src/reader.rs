@@ -11,11 +11,15 @@ use nom::{
     AsChar, Err, IResult, InputIter, InputTakeAtPosition,
 };
 
-use rug::{Float, Integer};
+use rug::Float as RugFloat;
 
-use crate::{Atom, Bool, Form};
+use crate::{Atom, Bool, Form, Integer};
 
 // -------------------- Utility Functions --------------------
+
+pub enum Error {
+    UnevenCountMapLiteral,
+}
 
 #[allow(dead_code)]
 fn comment<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
@@ -88,7 +92,7 @@ fn read_float<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, At
             recognize(tuple((read_integer, char('.'), digit0))),
             |s: &'a str| {
                 s.parse::<f64>()
-                    .map(|v| Atom::Float(Float::with_val(12, v)))
+                    .map(|v| Atom::Float(RugFloat::with_val(12, v).into()))
             },
         ),
     )(input)
@@ -186,7 +190,9 @@ fn read_list<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, For
         preceded(
             pair(whitespace0, tag("(")),
             terminated(
-                map(many0(read_form), Form::List),
+                map(many0(read_form), |forms| {
+                    Form::List(forms.into_iter().collect())
+                }),
                 pair(whitespace0, tag(")")),
             ),
         ),
@@ -199,7 +205,9 @@ fn read_vector<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, F
         preceded(
             pair(whitespace0, tag("[")),
             terminated(
-                map(many0(read_form), Form::Vector),
+                map(many0(read_form), |forms| {
+                    Form::Vector(forms.into_iter().collect())
+                }),
                 pair(whitespace0, tag("]")),
             ),
         ),

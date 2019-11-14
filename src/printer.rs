@@ -4,7 +4,7 @@ use once_cell::unsync::Lazy;
 
 use regex::{Captures, Regex};
 
-use crate::{Atom, Bool, Float, Form, Integer};
+use crate::{Atom, Bool, Float, Form, Integer, List, Vector};
 
 pub struct Options {
     pub print_readably: bool,
@@ -70,15 +70,28 @@ impl Printable for Float {
     }
 }
 
-impl Printable for &Vec<Form> {
+fn print_items<'a, I>(items: I, options: &Options, f: &mut fmt::Formatter) -> fmt::Result
+where
+    I: IntoIterator<Item = &'a Form>,
+{
+    let mut sep = "";
+    for form in items {
+        f.write_str(sep)?;
+        form.pr(options, f)?;
+        sep = " ";
+    }
+    Ok(())
+}
+
+impl Printable for List<Form> {
     fn pr(&self, options: &Options, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut sep = "";
-        for form in *self {
-            f.write_str(sep)?;
-            form.pr(options, f)?;
-            sep = " ";
-        }
-        Ok(())
+        print_items(self, options, f)
+    }
+}
+
+impl Printable for Vector<Form> {
+    fn pr(&self, options: &Options, f: &mut fmt::Formatter) -> fmt::Result {
+        print_items(self, options, f)
     }
 }
 
