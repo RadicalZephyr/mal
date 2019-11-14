@@ -155,4 +155,8 @@ impl Form {
     pub fn nil() -> Form {
         Form::Atom(Atom::Nil)
     }
+
+    pub fn _true() -> Form {
+        Form::Atom(Atom::Bool(Bool::True))
+    }
 }

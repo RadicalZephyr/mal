@@ -5,8 +5,12 @@ pub enum Error {
     Bad,
 }
 
-pub fn read_str2(_input: &str) -> Result<Form, Error> {
-    Ok(Form::nil())
+pub fn read_str2(input: &str) -> Result<Form, Error> {
+    match input {
+        "nil" => Ok(Form::nil()),
+        "true" => Ok(Form::_true()),
+        _ => Err(Error::Bad),
+    }
 }
 
 #[cfg(test)]
@@ -19,6 +23,11 @@ mod tests {
         #[test]
         fn nil() {
             assert_eq!(read_str2("nil"), Ok(Form::nil()));
+        }
+
+        #[test]
+        fn _true() {
+            assert_eq!(read_str2("true"), Ok(Form::_true()));
         }
     }
 }
