@@ -7,7 +7,7 @@ use nom::{
     combinator::{cut, map, opt, value},
     error::{context, ErrorKind as NomErrorKind, ParseError, VerboseError, VerboseErrorKind},
     multi::many_till,
-    sequence::{preceded, tuple},
+    sequence::{pair, preceded, tuple},
     AsChar, Err, IResult, InputTakeAtPosition,
 };
 
@@ -161,6 +161,13 @@ fn read_list<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, 
     )(input)
 }
 
+fn read_map<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
+    context(
+        "read_map",
+        value(Form::map(Vec::new()), pair(tag("{"), tag("}"))),
+    )(input)
+}
+
 fn read_form<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     context(
         "read_form",
@@ -169,6 +176,7 @@ fn read_form<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, 
             alt((
                 read_comment,
                 read_list,
+                read_map,
                 value(Form::nil(), tag("nil")),
                 value(Form::_true(), tag("true")),
             )),
@@ -289,6 +297,15 @@ mod tests {
                         kind: ErrorKind::UnclosedDelimiter(')'),
                     })
                 )
+            }
+        }
+
+        mod map {
+            use super::*;
+
+            #[test]
+            fn empty() {
+                assert_eq!(read_str2("{}"), Ok(Some(Form::map(Vec::new()))));
             }
         }
     }

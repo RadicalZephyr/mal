@@ -1,7 +1,7 @@
 use std::{
     collections::hash_map::RandomState,
     hash::{BuildHasher, Hash, Hasher},
-    iter::IntoIterator,
+    iter::{FromIterator, IntoIterator},
 };
 
 use archery::{RcK, SharedPointerKind};
@@ -73,6 +73,20 @@ where
 {
     fn clone(&self) -> Self {
         Map(self.0.clone())
+    }
+}
+
+impl<K, V, P, H> FromIterator<(K, V)> for Map<K, V, P, H>
+where
+    K: Eq + Hash,
+    P: SharedPointerKind,
+    H: BuildHasher + Clone + Default,
+{
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = (K, V)>,
+    {
+        Map(iter.into_iter().collect())
     }
 }
 
@@ -165,6 +179,10 @@ impl Form {
 
     pub fn list<F: IntoIterator<Item = Form>>(forms: F) -> Form {
         Form::List(forms.into_iter().collect())
+    }
+
+    pub fn map<F: IntoIterator<Item = (Form, Form)>>(forms: F) -> Form {
+        Form::Map(forms.into_iter().collect())
     }
 
     pub fn nil() -> Form {
