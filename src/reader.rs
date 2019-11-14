@@ -2,11 +2,11 @@ use std::str::FromStr;
 
 use nom::{
     branch::alt,
-    bytes::complete::tag,
+    bytes::complete::{escaped_transform, tag},
     character::complete::{char, digit0, digit1, not_line_ending},
-    combinator::{map, map_res, opt, peek, recognize, value},
+    combinator::{map, map_res, opt, recognize, value},
     error::{context, convert_error, make_error, ErrorKind, ParseError, VerboseError},
-    multi::{many0, many_till},
+    multi::many0,
     sequence::{pair, preceded, terminated, tuple},
     AsChar, Err, IResult, InputIter, InputTakeAtPosition,
 };
@@ -26,9 +26,10 @@ fn comment<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a s
     context("comment", preceded(tag(";;"), not_line_ending))(input)
 }
 
-fn stringchar0<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
+fn stringchar1<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
     match input.position(|item| item == '\\' || item == '"') {
-        None => Err(Err::Error(make_error(input, ErrorKind::RegexpFind))),
+        None => Err(Err::Error(make_error(input, ErrorKind::Eof))),
+        Some(index) if index == 0 => Err(Err::Error(make_error(input, ErrorKind::Eof))),
         Some(index) => Ok((&input[index..], &input[..index])),
     }
 }
@@ -114,25 +115,19 @@ fn read_nil<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Atom
 fn string_escapes<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
     context(
         "string_escapes",
-        map(
-            alt((tag(r#"\""#), tag(r"\\"), tag(r"\n"))),
-            |s: &str| match s {
-                r#"\""# => r#"""#,
-                r"\\" => r"\",
-                r"\n" => "\n",
-                _ => unreachable!(),
-            },
-        ),
+        map(alt((tag("\""), tag("\\"), tag("n"))), |s: &str| match s {
+            "\"" => r#"""#,
+            "\\" => r"\",
+            "n" => "\n",
+            _ => unreachable!(),
+        }),
     )(input)
 }
 
 fn string_contents<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, String, E> {
     context(
         "string_contents",
-        map(
-            many_till(alt((string_escapes, stringchar0)), peek(char('"'))),
-            |(xs, _)| xs.concat(),
-        ),
+        escaped_transform(stringchar1, '\\', string_escapes),
     )(input)
 }
 
@@ -271,18 +266,21 @@ pub fn read_str(input: &str) -> Result<Form, ()> {
 mod tests {
     use super::*;
 
-    mod stringchar0 {
+    mod stringchar1 {
         use super::*;
 
         #[test]
         fn test_empty_ended_by_backlash() {
-            assert_eq!(stringchar0::<VerboseError<&str>>("\\"), Ok(("\\", "")));
+            assert_eq!(
+                stringchar1::<VerboseError<&str>>("\\"),
+                Err(Err::Error(make_error("\\", ErrorKind::Eof)))
+            );
         }
 
         #[test]
         fn test_ended_by_backlash() {
             assert_eq!(
-                stringchar0::<VerboseError<&str>>(" a1-\\"),
+                stringchar1::<VerboseError<&str>>(" a1-\\"),
                 Ok(("\\", " a1-")),
             );
         }
@@ -293,20 +291,17 @@ mod tests {
 
         #[test]
         fn test_backslash() {
-            assert_eq!(string_escapes::<VerboseError<&str>>(r"\\"), Ok(("", r"\")));
+            assert_eq!(string_escapes::<VerboseError<&str>>("\\"), Ok(("", r"\")));
         }
 
         #[test]
         fn test_newline() {
-            assert_eq!(string_escapes::<VerboseError<&str>>(r"\n"), Ok(("", "\n")));
+            assert_eq!(string_escapes::<VerboseError<&str>>("n"), Ok(("", "\n")));
         }
 
         #[test]
         fn test_quote() {
-            assert_eq!(
-                string_escapes::<VerboseError<&str>>(r#"\""#),
-                Ok(("", r#"""#))
-            );
+            assert_eq!(string_escapes::<VerboseError<&str>>("\""), Ok(("", r#"""#)));
         }
     }
 
