@@ -10,11 +10,7 @@ use once_cell::unsync::Lazy;
 
 use regex::{Captures, Regex};
 
-use crate::{Atom, Bool, Float, Form, Integer, List, Map, Vector};
-
-pub struct Options {
-    pub print_readably: bool,
-}
+use crate::{Atom, Bool, Comment, Float, Form, Integer, List, Map, Vector};
 
 trait Printable {
     fn pr(&self, options: &Options, f: &mut fmt::Formatter) -> fmt::Result;
@@ -60,6 +56,20 @@ impl Printable for Bool {
         match self {
             True => f.write_str("true"),
             False => f.write_str("false"),
+        }
+    }
+}
+
+impl Printable for Comment {
+    fn pr(&self, options: &Options, f: &mut fmt::Formatter) -> fmt::Result {
+        use crate::Comment::*;
+
+        match self {
+            Line(s) => f.write_str(s),
+            Form(form) => {
+                f.write_str("#_")?;
+                form.pr(options, f)
+            }
         }
     }
 }
@@ -125,6 +135,13 @@ impl Printable for Form {
     fn pr(&self, options: &Options, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Form::Atom(atom) => atom.pr(options, f),
+            Form::Comment(comment) => {
+                if options.print_comments {
+                    comment.pr(options, f)
+                } else {
+                    Ok(())
+                }
+            }
             Form::List(forms) => {
                 f.write_str("(")?;
                 forms.pr(options, f)?;
@@ -144,18 +161,57 @@ impl Printable for Form {
     }
 }
 
-struct PrintForm<'a>(bool, &'a Form);
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Options {
+    pub print_comments: bool,
+    pub print_readably: bool,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+struct PrintForm<'a> {
+    form: &'a Form,
+    print_comments: bool,
+    print_readably: bool,
+}
+
+impl<'a> PrintForm<'a> {
+    fn new(form: &'a Form, print_comments: bool, print_readably: bool) -> PrintForm<'a> {
+        PrintForm {
+            form,
+            print_comments,
+            print_readably,
+        }
+    }
+
+    fn form(&self) -> &'a Form {
+        self.form
+    }
+
+    fn options(&self) -> Options {
+        let PrintForm {
+            print_comments,
+            print_readably,
+            ..
+        } = *self;
+        Options {
+            print_comments,
+            print_readably,
+        }
+    }
+
+    fn as_parts(&self) -> (&'a Form, Options) {
+        (self.form(), self.options())
+    }
+}
 
 impl<'a> fmt::Display for PrintForm<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let PrintForm(print_readably, ref form) = &self;
-        let options = Options {
-            print_readably: *print_readably,
-        };
+        let (form, options) = self.as_parts();
         form.pr(&options, f)
     }
 }
 
 pub fn pr_str(form: &Form, print_readably: bool) -> String {
-    format!("{}", PrintForm(print_readably, form))
+    let print_comments = false;
+    format!("{}", PrintForm::new(form, print_comments, print_readably))
 }

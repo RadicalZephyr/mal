@@ -144,8 +144,15 @@ pub enum Atom {
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub enum Comment {
+    Line(String),
+    Form(Box<Form>),
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Form {
     Atom(Atom),
+    Comment(Comment),
     List(List<Form>),
     Map(Map<Form, Form>),
     Vector(Vector<Form>),
