@@ -150,3 +150,9 @@ pub enum Form {
     Map(Map<Form, Form>),
     Vector(Vector<Form>),
 }
+
+impl Form {
+    pub fn nil() -> Form {
+        Form::Atom(Atom::Nil)
+    }
+}
