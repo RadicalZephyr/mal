@@ -3,15 +3,15 @@ use derive_more::Display;
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{char, digit1, not_line_ending},
-    combinator::{cut, map, opt, value},
+    character::complete::{char, digit0, digit1, not_line_ending},
+    combinator::{cut, map, opt, recognize, value},
     error::{context, ErrorKind as NomErrorKind, ParseError, VerboseError, VerboseErrorKind},
     multi::many_till,
     sequence::{pair, preceded, tuple},
     AsChar, Err, IResult, InputTakeAtPosition,
 };
 
-use rug::Integer as RugInteger;
+use rug::{Float as RugFloat, Integer as RugInteger};
 
 use crate::{Comment, Form};
 
@@ -204,6 +204,15 @@ fn read_vector<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str
     )(input)
 }
 
+fn read_float<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
+    context(
+        "read_float",
+        map(recognize(tuple((digit1, char('.'), digit0))), |i: &str| {
+            Form::float(RugFloat::with_val(53, RugFloat::parse(i).unwrap()))
+        }),
+    )(input)
+}
+
 fn read_integer<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     context(
         "read_integer",
@@ -223,6 +232,7 @@ fn read_form<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, 
                 read_list,
                 read_map,
                 read_vector,
+                read_float,
                 read_integer,
                 value(Form::nil(), tag("nil")),
                 value(Form::_true(), tag("true")),
@@ -301,14 +311,32 @@ mod tests {
             assert_eq!(read_str2("false"), Ok(Some(Form::_false())));
         }
 
-        #[test]
-        fn zero() {
-            assert_eq!(read_str2("0"), Ok(Some(Form::integer(0u8))))
+        mod integer {
+            use super::*;
+
+            #[test]
+            fn zero() {
+                assert_eq!(read_str2("0"), Ok(Some(Form::integer(0u8))))
+            }
+
+            #[test]
+            fn one_hundred() {
+                assert_eq!(read_str2("100"), Ok(Some(Form::integer(100u8))));
+            }
         }
 
-        #[test]
-        fn one_hundred() {
-            assert_eq!(read_str2("100"), Ok(Some(Form::integer(100u8))));
+        mod float {
+            use super::*;
+
+            #[test]
+            fn zero() {
+                assert_eq!(read_str2("0.0"), Ok(Some(Form::float(0.0f32))));
+            }
+
+            #[test]
+            fn one_hundred() {
+                assert_eq!(read_str2("100.0"), Ok(Some(Form::float(100.0f32))));
+            }
         }
     }
 

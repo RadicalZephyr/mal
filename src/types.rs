@@ -12,7 +12,7 @@ use rpds::map::hash_trie_map::Iter as HashTrieMapIter;
 use rpds::HashTrieMap;
 pub use rpds::{List, Vector};
 
-use rug::{Float as RugFloat, Integer as RugInteger};
+use rug::{Assign, Float as RugFloat, Integer as RugInteger};
 
 #[derive(Clone, Debug, Deref, Display, From)]
 pub struct Float(pub RugFloat);
@@ -209,7 +209,14 @@ impl Form {
         Form::Atom(Atom::Bool(Bool::False))
     }
 
-    pub fn integer(i: impl Into<RugInteger>) -> Form {
-        Form::Atom(Atom::Integer(Integer(i.into())))
+    pub fn float<T>(x: T) -> Form
+    where
+        RugFloat: Assign<T>,
+    {
+        Form::Atom(Atom::Float(Float(RugFloat::with_val(54, x))))
+    }
+
+    pub fn integer(x: impl Into<RugInteger>) -> Form {
+        Form::Atom(Atom::Integer(Integer(x.into())))
     }
 }
