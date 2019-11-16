@@ -11,7 +11,7 @@ use nom::{
     AsChar, Err, IResult, InputTakeAtPosition,
 };
 
-use rug::{Float as RugFloat, Integer as RugInteger};
+use rug::{Float as RugFloat, Integer as RugInteger, Rational as RugRational};
 
 use crate::{Comment, Form};
 
@@ -222,6 +222,15 @@ fn read_integer<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a st
     )(input)
 }
 
+fn read_rational<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
+    context(
+        "read_rational",
+        map(recognize(tuple((digit1, char('/'), digit1))), |i: &str| {
+            Form::rational(i.parse::<RugRational>().unwrap())
+        }),
+    )(input)
+}
+
 fn read_form<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     context(
         "read_form",
@@ -233,6 +242,7 @@ fn read_form<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, 
                 read_map,
                 read_vector,
                 read_float,
+                read_rational,
                 read_integer,
                 value(Form::nil(), tag("nil")),
                 value(Form::_true(), tag("true")),
@@ -316,7 +326,7 @@ mod tests {
 
             #[test]
             fn zero() {
-                assert_eq!(read_str2("0"), Ok(Some(Form::integer(0u8))))
+                assert_eq!(read_str2("0"), Ok(Some(Form::integer(0u8))));
             }
 
             #[test]
@@ -336,6 +346,20 @@ mod tests {
             #[test]
             fn one_hundred() {
                 assert_eq!(read_str2("100.0"), Ok(Some(Form::float(100.0f32))));
+            }
+        }
+
+        mod rational {
+            use super::*;
+
+            #[test]
+            fn zero() {
+                assert_eq!(read_str2("0/1"), Ok(Some(Form::rational((0, 1)))));
+            }
+
+            #[test]
+            fn one_hundred() {
+                assert_eq!(read_str2("200/2"), Ok(Some(Form::rational((100, 1)))));
             }
         }
     }

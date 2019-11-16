@@ -2,10 +2,10 @@ use std::{hash::Hash, iter::IntoIterator};
 
 pub use rpds::{List, Vector};
 
-use rug::{Assign, Float as RugFloat, Integer as RugInteger};
+use rug::{Assign, Float as RugFloat, Integer as RugInteger, Rational as RugRational};
 
 mod atoms;
-pub use atoms::{Atom, Bool, Float, Integer};
+pub use atoms::{Atom, Bool, Float, Integer, Rational};
 
 mod sequences;
 pub use sequences::Map;
@@ -71,5 +71,9 @@ impl Form {
 
     pub fn integer(x: impl Into<RugInteger>) -> Form {
         Form::Atom(Atom::Integer(Integer(x.into())))
+    }
+
+    pub fn rational(x: impl Into<RugRational>) -> Form {
+        Form::Atom(Atom::Rational(Rational(x.into())))
     }
 }

@@ -2,7 +2,7 @@ use std::hash::{Hash, Hasher};
 
 use derive_more::{Deref, Display, From, FromStr};
 
-use rug::{Float as RugFloat, Integer as RugInteger};
+use rug::{Float as RugFloat, Integer as RugInteger, Rational as RugRational};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Atom {
@@ -11,6 +11,7 @@ pub enum Atom {
     Integer(Integer),
     Keyword(String),
     Nil,
+    Rational(Rational),
     String(String),
     Symbol(String),
 }
@@ -49,3 +50,6 @@ impl Eq for Float {}
 
 #[derive(Clone, Debug, Deref, Display, From, FromStr, Hash, PartialEq, Eq)]
 pub struct Integer(pub RugInteger);
+
+#[derive(Clone, Debug, Deref, Display, From, FromStr, Hash, PartialEq, Eq)]
+pub struct Rational(pub RugRational);

@@ -10,7 +10,7 @@ use once_cell::unsync::Lazy;
 
 use regex::{Captures, Regex};
 
-use crate::{Atom, Bool, Comment, Float, Form, Integer, List, Map, Vector};
+use crate::{Atom, Bool, Comment, Float, Form, Integer, List, Map, Rational, Vector};
 
 trait Printable {
     fn pr(&self, options: &Options, f: &mut fmt::Formatter) -> fmt::Result;
@@ -42,6 +42,7 @@ impl Printable for Atom {
             Bool(value) => value.pr(options, f),
             Float(value) => value.pr(options, f),
             Integer(value) => value.pr(options, f),
+            Rational(value) => value.pr(options, f),
             Symbol(name) | Keyword(name) => f.write_str(&name),
             String(contents) => write!(f, "\"{}\"", print_string(contents)),
             Nil => f.write_str("nil"),
@@ -81,6 +82,12 @@ impl Printable for Integer {
 }
 
 impl Printable for Float {
+    fn pr(&self, _options: &Options, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(&self, f)
+    }
+}
+
+impl Printable for Rational {
     fn pr(&self, _options: &Options, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(&self, f)
     }

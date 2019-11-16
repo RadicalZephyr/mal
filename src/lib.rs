@@ -8,4 +8,4 @@ mod reader2;
 pub use reader2::{read_str2, Error as ReaderError2};
 
 mod types;
-pub use types::{Atom, Bool, Comment, Float, Form, Integer, List, Map, Vector};
+pub use types::{Atom, Bool, Comment, Float, Form, Integer, List, Map, Rational, Vector};
