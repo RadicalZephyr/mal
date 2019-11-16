@@ -3,13 +3,15 @@ use derive_more::Display;
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{char, not_line_ending},
+    character::complete::{char, digit1, not_line_ending},
     combinator::{cut, map, opt, value},
     error::{context, ErrorKind as NomErrorKind, ParseError, VerboseError, VerboseErrorKind},
     multi::many_till,
     sequence::{pair, preceded, tuple},
     AsChar, Err, IResult, InputTakeAtPosition,
 };
+
+use rug::Integer as RugInteger;
 
 use crate::{Comment, Form};
 
@@ -202,6 +204,15 @@ fn read_vector<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str
     )(input)
 }
 
+fn read_integer<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
+    context(
+        "read_integer",
+        map(digit1, |i: &str| {
+            Form::integer(i.parse::<RugInteger>().unwrap())
+        }),
+    )(input)
+}
+
 fn read_form<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     context(
         "read_form",
@@ -212,8 +223,10 @@ fn read_form<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, 
                 read_list,
                 read_map,
                 read_vector,
+                read_integer,
                 value(Form::nil(), tag("nil")),
                 value(Form::_true(), tag("true")),
+                value(Form::_false(), tag("false")),
             )),
         ),
     )(input)
@@ -281,6 +294,21 @@ mod tests {
         #[test]
         fn _true() {
             assert_eq!(read_str2("true"), Ok(Some(Form::_true())));
+        }
+
+        #[test]
+        fn _false() {
+            assert_eq!(read_str2("false"), Ok(Some(Form::_false())));
+        }
+
+        #[test]
+        fn zero() {
+            assert_eq!(read_str2("0"), Ok(Some(Form::integer(0u8))))
+        }
+
+        #[test]
+        fn one_hundred() {
+            assert_eq!(read_str2("100"), Ok(Some(Form::integer(100u8))));
         }
     }
 

@@ -204,4 +204,12 @@ impl Form {
     pub fn _true() -> Form {
         Form::Atom(Atom::Bool(Bool::True))
     }
+
+    pub fn _false() -> Form {
+        Form::Atom(Atom::Bool(Bool::False))
+    }
+
+    pub fn integer(i: impl Into<RugInteger>) -> Form {
+        Form::Atom(Atom::Integer(Integer(i.into())))
+    }
 }
