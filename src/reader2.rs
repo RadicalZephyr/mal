@@ -171,6 +171,19 @@ fn read_map<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, F
     )(input)
 }
 
+fn read_vector<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
+    context(
+        "read_vector",
+        with_kind!(
+            ErrorKind::UnclosedDelimiter(']'),
+            map(
+                preceded(char('['), cut(many_till(read_form, char(']')))),
+                |(kvs, _)| Form::vector(kvs),
+            )
+        ),
+    )(input)
+}
+
 fn read_form<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     context(
         "read_form",
@@ -180,6 +193,7 @@ fn read_form<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, 
                 read_comment,
                 read_list,
                 read_map,
+                read_vector,
                 value(Form::nil(), tag("nil")),
                 value(Form::_true(), tag("true")),
             )),
@@ -328,6 +342,53 @@ mod tests {
                         (Form::nil(), Form::_true())
                     ])))
                 );
+            }
+
+        mod vector {
+            use super::*;
+
+            use nom::error::{
+                ErrorKind::{Alt, ManyTill, Tag},
+                VerboseErrorKind::{Context, Nom},
+            };
+
+            #[test]
+            fn empty() {
+                assert_eq!(read_str2("[]"), Ok(Some(Form::empty_vector())));
+            }
+
+            #[test]
+            fn one_element() {
+                assert_eq!(
+                    read_str2("[nil]"),
+                    Ok(Some(Form::vector(std::iter::once(Form::nil()))))
+                );
+            }
+
+            #[test]
+            fn n_element() {
+                assert_eq!(
+                    read_str2("[true nil]"),
+                    Ok(Some(Form::vector(vec![Form::_true(), Form::nil()])))
+                )
+            }
+
+            #[test]
+            fn unterminated() {
+                assert_eq!(
+                    read_str2("[nil true"),
+                    Err(Error {
+                        error: VerboseError {
+                            errors: vec![
+                                ("", Nom(Tag)),
+                                ("", Nom(Alt)),
+                                ("", Nom(ManyTill)),
+                                ("[nil true", Context("ErrorKind::UnclosedDelimiter(\']\')"))
+                            ]
+                        },
+                        kind: ErrorKind::UnclosedDelimiter(']'),
+                    })
+                )
             }
         }
     }

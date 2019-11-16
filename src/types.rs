@@ -181,12 +181,20 @@ impl Form {
         Form::Map(Map::new())
     }
 
+    pub fn empty_vector() -> Form {
+        Form::Vector(Vector::new())
+    }
+
     pub fn list<F: IntoIterator<Item = Form>>(forms: F) -> Form {
         Form::List(forms.into_iter().collect())
     }
 
     pub fn map<F: IntoIterator<Item = (Form, Form)>>(forms: F) -> Form {
         Form::Map(forms.into_iter().collect())
+    }
+
+    pub fn vector<F: IntoIterator<Item = Form>>(forms: F) -> Form {
+        Form::Vector(forms.into_iter().collect())
     }
 
     pub fn nil() -> Form {
