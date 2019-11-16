@@ -3,10 +3,11 @@ use derive_more::Display;
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{char, digit0, digit1, not_line_ending},
+    character::complete::{char, digit1, not_line_ending},
     combinator::{cut, map, opt, recognize, value},
     error::{context, ErrorKind as NomErrorKind, ParseError, VerboseError, VerboseErrorKind},
     multi::many_till,
+    number::complete::recognize_float,
     sequence::{delimited, pair, preceded, separated_pair, tuple},
     AsChar, Err, IResult, InputTakeAtPosition,
 };
@@ -206,24 +207,13 @@ fn read_vector<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str
     )(input)
 }
 
-fn read_floating_point_value<'a, E: ParseErrorExt<&'a str>>(
-) -> impl Fn(&'a str) -> IResult<&'a str, &'a str, E> {
-    |input: &str| -> IResult<&'a str, &'a str, E> {
-        recognize(tuple((digit1, char('.'), digit1)))(input)
-    }
-}
-
 fn read_complex<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     context(
         "read_complex",
         map(
             recognize(delimited(
                 char('('),
-                separated_pair(
-                    read_floating_point_value(),
-                    char(','),
-                    read_floating_point_value(),
-                ),
+                separated_pair(recognize_float, char(','), recognize_float),
                 char(')'),
             )),
             |i: &str| Form::complex(RugComplex::with_val(53, RugComplex::parse(i).unwrap())),
@@ -234,7 +224,7 @@ fn read_complex<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a st
 fn read_float<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     context(
         "read_float",
-        map(recognize(tuple((digit1, char('.'), digit0))), |i: &str| {
+        map(recognize(tuple((digit1, char('.'), digit1))), |i: &str| {
             Form::float(RugFloat::with_val(53, RugFloat::parse(i).unwrap()))
         }),
     )(input)
