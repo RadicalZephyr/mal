@@ -23,29 +23,33 @@ trait ParseErrorExt<I>: ParseError<I> {
 #[allow(dead_code)]
 #[derive(Copy, Clone, Debug, Display, PartialEq)]
 pub enum ErrorKind {
-    Bad,
-
     #[display(fmt = "this file contains an un-closed delimiter: `{}`", _0)]
     UnclosedDelimiter(char),
+
+    #[display(fmt = "incomplete parse")]
+    Incomplete,
 
     #[display(fmt = "incorrect close delimiter: `{}`", _0)]
     IncorrectCloseDelimiter(char),
 
     #[display(fmt = "unexpected close delimiter: `{}`", _0)]
     UnexpectedCloseDelimiter(char),
+
+    #[display(fmt = "uneven number of elements found in map")]
+    UnevenNumberOfMapElements,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Error<I> {
     error: VerboseError<I>,
-    kind: ErrorKind,
+    kind: Option<ErrorKind>,
 }
 
 impl<I> Error<I> {
     fn from_kind(input: I, kind: ErrorKind) -> Self {
         Error {
             error: VerboseError::from_error_kind(input, NomErrorKind::Eof),
-            kind,
+            kind: Some(kind),
         }
     }
 }
@@ -54,7 +58,7 @@ impl<I> ParseError<I> for Error<I> {
     fn from_error_kind(input: I, kind: NomErrorKind) -> Self {
         Error {
             error: VerboseError::from_error_kind(input, kind),
-            kind: ErrorKind::Bad,
+            kind: None,
         }
     }
 
@@ -72,11 +76,13 @@ where
     Error<I>: ParseError<I>,
 {
     fn add_kind(input: I, context: &'static str, kind: ErrorKind, mut other: Self) -> Self {
-        other
-            .error
-            .errors
-            .push((input, VerboseErrorKind::Context(context)));
-        other.kind = kind;
+        if other.kind.is_none() {
+            other
+                .error
+                .errors
+                .push((input, VerboseErrorKind::Context(context)));
+            other.kind = Some(kind);
+        }
         other
     }
 }
@@ -164,9 +170,21 @@ fn read_list<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, 
 fn read_map<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     context(
         "read_map",
-        map(
-            preceded(char('{'), many_till(pair(read_form, read_form), char('}'))),
-            |(kvs, _)| Form::map(kvs),
+        with_kind!(
+            ErrorKind::UnclosedDelimiter('}'),
+            map(
+                preceded(
+                    char('{'),
+                    cut(many_till(
+                        pair(
+                            read_form,
+                            with_kind!(ErrorKind::UnevenNumberOfMapElements, cut(read_form))
+                        ),
+                        char('}')
+                    ))
+                ),
+                |(kvs, _)| Form::map(kvs),
+            )
         ),
     )(input)
 }
@@ -211,7 +229,7 @@ pub fn read_str2<'a>(input: &'a str) -> Result<Option<Form>, Error<&'a str>> {
     match opt_read_form::<self::Error<&'a str>>(input) {
         Ok((_, form)) => Ok(form),
         Err(e) => match e {
-            Err::Incomplete(_i) => Err(self::Error::from_kind(input, ErrorKind::Bad)),
+            Err::Incomplete(_i) => Err(self::Error::from_kind(input, ErrorKind::Incomplete)),
             Err::Error(e) | Err::Failure(e) => Err(e),
         },
     }
@@ -311,7 +329,7 @@ mod tests {
                                 ("(nil true", Context("ErrorKind::UnclosedDelimiter(\')\')"))
                             ]
                         },
-                        kind: ErrorKind::UnclosedDelimiter(')'),
+                        kind: Some(ErrorKind::UnclosedDelimiter(')')),
                     })
                 )
             }
@@ -319,6 +337,11 @@ mod tests {
 
         mod map {
             use super::*;
+
+            use nom::error::{
+                ErrorKind::{Alt, ManyTill, Tag},
+                VerboseErrorKind::{Context, Nom},
+            };
 
             #[test]
             fn empty() {
@@ -343,6 +366,42 @@ mod tests {
                     ])))
                 );
             }
+
+            #[test]
+            fn unterminated() {
+                assert_eq!(
+                    read_str2("{nil true"),
+                    Err(Error {
+                        error: VerboseError {
+                            errors: vec![
+                                ("", Nom(Tag)),
+                                ("", Nom(Alt)),
+                                ("", Nom(ManyTill)),
+                                ("{nil true", Context("ErrorKind::UnclosedDelimiter(\'}\')"))
+                            ]
+                        },
+                        kind: Some(ErrorKind::UnclosedDelimiter('}')),
+                    })
+                )
+            }
+
+            #[test]
+            fn uneven_number_of_elements() {
+                assert_eq!(
+                    read_str2("{true nil nil}"),
+                    Err(Error {
+                        error: VerboseError {
+                            errors: vec![
+                                ("}", Nom(Tag)),
+                                ("}", Nom(Alt)),
+                                ("}", Context("ErrorKind::UnevenNumberOfMapElements"))
+                            ]
+                        },
+                        kind: Some(ErrorKind::UnevenNumberOfMapElements),
+                    })
+                )
+            }
+        }
 
         mod vector {
             use super::*;
@@ -386,7 +445,7 @@ mod tests {
                                 ("[nil true", Context("ErrorKind::UnclosedDelimiter(\']\')"))
                             ]
                         },
-                        kind: ErrorKind::UnclosedDelimiter(']'),
+                        kind: Some(ErrorKind::UnclosedDelimiter(']')),
                     })
                 )
             }
