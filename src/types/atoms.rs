@@ -2,11 +2,14 @@ use std::hash::{Hash, Hasher};
 
 use derive_more::{Deref, Display, From, FromStr};
 
-use rug::{Float as RugFloat, Integer as RugInteger, Rational as RugRational};
+use rug::{
+    Complex as RugComplex, Float as RugFloat, Integer as RugInteger, Rational as RugRational,
+};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Atom {
     Bool(Bool),
+    Complex(Complex),
     Float(Float),
     Integer(Integer),
     Keyword(String),
@@ -16,11 +19,37 @@ pub enum Atom {
     Symbol(String),
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Display, Hash, PartialEq, Eq)]
 pub enum Bool {
     True,
     False,
 }
+
+#[derive(Clone, Debug, Deref, Display, From)]
+pub struct Complex(pub RugComplex);
+
+impl Complex {
+    fn limited_repr(&self) -> String {
+        format!("{:.31}", self.0)
+    }
+}
+
+impl Hash for Complex {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        self.limited_repr().hash(state)
+    }
+}
+
+impl PartialEq for Complex {
+    fn eq(&self, other: &Self) -> bool {
+        self.limited_repr().eq(&other.limited_repr())
+    }
+}
+
+impl Eq for Complex {}
 
 #[derive(Clone, Debug, Deref, Display, From)]
 pub struct Float(pub RugFloat);

@@ -10,7 +10,7 @@ use once_cell::unsync::Lazy;
 
 use regex::{Captures, Regex};
 
-use crate::{Atom, Bool, Comment, Float, Form, Integer, List, Map, Rational, Vector};
+use crate::{Atom, Bool, Comment, Complex, Float, Form, Integer, List, Map, Rational, Vector};
 
 trait Printable {
     fn pr(&self, options: &Options, f: &mut fmt::Formatter) -> fmt::Result;
@@ -40,6 +40,7 @@ impl Printable for Atom {
 
         match self {
             Bool(value) => value.pr(options, f),
+            Complex(value) => value.pr(options, f),
             Float(value) => value.pr(options, f),
             Integer(value) => value.pr(options, f),
             Rational(value) => value.pr(options, f),
@@ -72,6 +73,12 @@ impl Printable for Comment {
                 form.pr(options, f)
             }
         }
+    }
+}
+
+impl Printable for Complex {
+    fn pr(&self, _options: &Options, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(&self, f)
     }
 }
 

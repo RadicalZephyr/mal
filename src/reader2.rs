@@ -7,11 +7,13 @@ use nom::{
     combinator::{cut, map, opt, recognize, value},
     error::{context, ErrorKind as NomErrorKind, ParseError, VerboseError, VerboseErrorKind},
     multi::many_till,
-    sequence::{pair, preceded, tuple},
+    sequence::{delimited, pair, preceded, separated_pair, tuple},
     AsChar, Err, IResult, InputTakeAtPosition,
 };
 
-use rug::{Float as RugFloat, Integer as RugInteger, Rational as RugRational};
+use rug::{
+    Complex as RugComplex, Float as RugFloat, Integer as RugInteger, Rational as RugRational,
+};
 
 use crate::{Comment, Form};
 
@@ -204,6 +206,31 @@ fn read_vector<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str
     )(input)
 }
 
+fn read_floating_point_value<'a, E: ParseErrorExt<&'a str>>(
+) -> impl Fn(&'a str) -> IResult<&'a str, &'a str, E> {
+    |input: &str| -> IResult<&'a str, &'a str, E> {
+        recognize(tuple((digit1, char('.'), digit1)))(input)
+    }
+}
+
+fn read_complex<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
+    context(
+        "read_complex",
+        map(
+            recognize(delimited(
+                char('('),
+                separated_pair(
+                    read_floating_point_value(),
+                    char(','),
+                    read_floating_point_value(),
+                ),
+                char(')'),
+            )),
+            |i: &str| Form::complex(RugComplex::with_val(53, RugComplex::parse(i).unwrap())),
+        ),
+    )(input)
+}
+
 fn read_float<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     context(
         "read_float",
@@ -231,6 +258,13 @@ fn read_rational<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a s
     )(input)
 }
 
+fn read_reader_macros<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
+    context(
+        "read_reader_macros",
+        preceded(char('#'), preceded(char('i'), read_complex)),
+    )(input)
+}
+
 fn read_form<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     context(
         "read_form",
@@ -241,6 +275,7 @@ fn read_form<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, 
                 read_list,
                 read_map,
                 read_vector,
+                read_reader_macros,
                 read_float,
                 read_rational,
                 read_integer,
@@ -319,6 +354,18 @@ mod tests {
         #[test]
         fn _false() {
             assert_eq!(read_str2("false"), Ok(Some(Form::_false())));
+        }
+
+        mod complex {
+            use super::*;
+
+            #[test]
+            fn zero() {
+                assert_eq!(
+                    read_str2("#i(1.0,1.0)"),
+                    Ok(Some(Form::complex((1.0f32, 1.0f32))))
+                );
+            }
         }
 
         mod integer {

@@ -2,10 +2,13 @@ use std::{hash::Hash, iter::IntoIterator};
 
 pub use rpds::{List, Vector};
 
-use rug::{Assign, Float as RugFloat, Integer as RugInteger, Rational as RugRational};
+use rug::{
+    Assign, Complex as RugComplex, Float as RugFloat, Integer as RugInteger,
+    Rational as RugRational,
+};
 
 mod atoms;
-pub use atoms::{Atom, Bool, Float, Integer, Rational};
+pub use atoms::{Atom, Bool, Complex, Float, Integer, Rational};
 
 mod sequences;
 pub use sequences::Map;
@@ -60,6 +63,13 @@ impl Form {
 
     pub fn _false() -> Form {
         Form::Atom(Atom::Bool(Bool::False))
+    }
+
+    pub fn complex<T>(x: T) -> Form
+    where
+        RugComplex: Assign<T>,
+    {
+        Form::Atom(Atom::Complex(Complex(RugComplex::with_val(54, x))))
     }
 
     pub fn float<T>(x: T) -> Form
