@@ -207,45 +207,60 @@ fn read_vector<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str
     )(input)
 }
 
-fn read_complex<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
-    context(
-        "read_complex",
-        map(
-            recognize(delimited(
-                char('('),
-                separated_pair(recognize_float, char(','), recognize_float),
-                char(')'),
-            )),
-            |i: &str| Form::complex(RugComplex::with_val(53, RugComplex::parse(i).unwrap())),
-        ),
-    )(input)
+macro_rules! reader_fns {
+    {
+        $(
+            fn $name:ident($input:ident : &str) -> Form:: $form_constructor:tt {
+                $recognizer:expr => |$recognized:ident : &str| $expansion:expr
+            }
+        )*
+    } => {
+        $(
+            fn $name<'a, E: ParseErrorExt<&'a str>>($input : &'a str) -> IResult<&'a str, Form, E> {
+                context(
+                    stringify!($name),
+                    map($recognizer, |$recognized: &str| Form:: $form_constructor($expansion)),
+                )($input)
+            }
+        )*
+    }
 }
 
-fn read_float<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
-    context(
-        "read_float",
-        map(recognize(tuple((digit1, char('.'), digit1))), |i: &str| {
-            Form::float(RugFloat::with_val(53, RugFloat::parse(i).unwrap()))
-        }),
-    )(input)
-}
+reader_fns! {
 
-fn read_integer<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
-    context(
-        "read_integer",
-        map(digit1, |i: &str| {
-            Form::integer(i.parse::<RugInteger>().unwrap())
-        }),
-    )(input)
-}
+    // ---------------------------------------------
+    // ---  Numbers
+    // ---------------------------------------------
 
-fn read_rational<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
-    context(
-        "read_rational",
-        map(recognize(tuple((digit1, char('/'), digit1))), |i: &str| {
-            Form::rational(i.parse::<RugRational>().unwrap())
-        }),
-    )(input)
+    fn read_complex(input: &str) -> Form::complex {
+        recognize(delimited(
+            char('('),
+            separated_pair(
+                recognize_float,
+                char(','),
+                recognize_float),
+            char(')'),
+        )) => |i: &str| RugComplex::with_val(53, RugComplex::parse(i).unwrap())
+    }
+
+    fn read_float(input: &str) -> Form::float {
+        recognize(tuple((digit1, char('.'), digit1)))
+            => |i: &str| {
+                RugFloat::with_val(53, RugFloat::parse(i).unwrap())
+            }
+    }
+
+    fn read_integer(input: &str) -> Form::integer {
+        digit1 => |i: &str| {
+            i.parse::<RugInteger>().unwrap()
+        }
+    }
+
+    fn read_rational(input: &str) -> Form::rational {
+        recognize(tuple((digit1, char('/'), digit1))) => |i: &str| {
+            (i.parse::<RugRational>().unwrap())
+        }
+    }
 }
 
 fn read_reader_macros<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
