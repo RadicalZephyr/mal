@@ -298,7 +298,7 @@ fn opt_read_form<'a, E: ParseErrorExt<&'a str>>(
     opt(read_form)(input)
 }
 
-pub fn read_str2<'a>(input: &'a str) -> Result<Option<Form>, Error<&'a str>> {
+pub fn read_str<'a>(input: &'a str) -> Result<Option<Form>, Error<&'a str>> {
     match opt_read_form::<self::Error<&'a str>>(input) {
         Ok((_, form)) => Ok(form),
         Err(e) => match e {
@@ -317,7 +317,7 @@ mod tests {
 
         #[test]
         fn leading_whitespace() {
-            assert_eq!(read_str2("  nil"), Ok(Some(Form::nil())));
+            assert_eq!(read_str("  nil"), Ok(Some(Form::nil())));
         }
     }
 
@@ -329,7 +329,7 @@ mod tests {
         #[test]
         fn line() {
             assert_eq!(
-                read_str2("; Comment"),
+                read_str("; Comment"),
                 Ok(Some(Form::Comment(Comment::Line(" Comment".into()))))
             );
         }
@@ -337,7 +337,7 @@ mod tests {
         #[test]
         fn form() {
             assert_eq!(
-                read_str2("#_nil"),
+                read_str("#_nil"),
                 Ok(Some(Form::Comment(Comment::Form(Box::new(Form::nil())))))
             )
         }
@@ -348,17 +348,17 @@ mod tests {
 
         #[test]
         fn nil() {
-            assert_eq!(read_str2("nil"), Ok(Some(Form::nil())));
+            assert_eq!(read_str("nil"), Ok(Some(Form::nil())));
         }
 
         #[test]
         fn _true() {
-            assert_eq!(read_str2("true"), Ok(Some(Form::_true())));
+            assert_eq!(read_str("true"), Ok(Some(Form::_true())));
         }
 
         #[test]
         fn _false() {
-            assert_eq!(read_str2("false"), Ok(Some(Form::_false())));
+            assert_eq!(read_str("false"), Ok(Some(Form::_false())));
         }
 
         mod complex {
@@ -367,7 +367,7 @@ mod tests {
             #[test]
             fn zero() {
                 assert_eq!(
-                    read_str2("#i(1.0,1.0)"),
+                    read_str("#i(1.0,1.0)"),
                     Ok(Some(Form::complex((1.0f32, 1.0f32))))
                 );
             }
@@ -378,12 +378,12 @@ mod tests {
 
             #[test]
             fn zero() {
-                assert_eq!(read_str2("0"), Ok(Some(Form::integer(0u8))));
+                assert_eq!(read_str("0"), Ok(Some(Form::integer(0u8))));
             }
 
             #[test]
             fn one_hundred() {
-                assert_eq!(read_str2("100"), Ok(Some(Form::integer(100u8))));
+                assert_eq!(read_str("100"), Ok(Some(Form::integer(100u8))));
             }
         }
 
@@ -392,12 +392,12 @@ mod tests {
 
             #[test]
             fn zero() {
-                assert_eq!(read_str2("0.0"), Ok(Some(Form::float(0.0f32))));
+                assert_eq!(read_str("0.0"), Ok(Some(Form::float(0.0f32))));
             }
 
             #[test]
             fn one_hundred() {
-                assert_eq!(read_str2("100.0"), Ok(Some(Form::float(100.0f32))));
+                assert_eq!(read_str("100.0"), Ok(Some(Form::float(100.0f32))));
             }
         }
 
@@ -406,12 +406,12 @@ mod tests {
 
             #[test]
             fn zero() {
-                assert_eq!(read_str2("0/1"), Ok(Some(Form::rational((0, 1)))));
+                assert_eq!(read_str("0/1"), Ok(Some(Form::rational((0, 1)))));
             }
 
             #[test]
             fn one_hundred() {
-                assert_eq!(read_str2("200/2"), Ok(Some(Form::rational((100, 1)))));
+                assert_eq!(read_str("200/2"), Ok(Some(Form::rational((100, 1)))));
             }
         }
     }
@@ -429,13 +429,13 @@ mod tests {
 
             #[test]
             fn empty() {
-                assert_eq!(read_str2("()"), Ok(Some(Form::empty_list())));
+                assert_eq!(read_str("()"), Ok(Some(Form::empty_list())));
             }
 
             #[test]
             fn one_element() {
                 assert_eq!(
-                    read_str2("(nil)"),
+                    read_str("(nil)"),
                     Ok(Some(Form::list(std::iter::once(Form::nil()))))
                 );
             }
@@ -443,7 +443,7 @@ mod tests {
             #[test]
             fn n_element() {
                 assert_eq!(
-                    read_str2("(true nil)"),
+                    read_str("(true nil)"),
                     Ok(Some(Form::list(vec![Form::_true(), Form::nil()])))
                 )
             }
@@ -451,7 +451,7 @@ mod tests {
             #[test]
             fn unterminated() {
                 assert_eq!(
-                    read_str2("(nil true"),
+                    read_str("(nil true"),
                     Err(Error {
                         error: VerboseError {
                             errors: vec![
@@ -477,13 +477,13 @@ mod tests {
 
             #[test]
             fn empty() {
-                assert_eq!(read_str2("{}"), Ok(Some(Form::empty_map())));
+                assert_eq!(read_str("{}"), Ok(Some(Form::empty_map())));
             }
 
             #[test]
             fn one_kv() {
                 assert_eq!(
-                    read_str2("{true nil}"),
+                    read_str("{true nil}"),
                     Ok(Some(Form::map(vec![(Form::_true(), Form::nil())])))
                 );
             }
@@ -491,7 +491,7 @@ mod tests {
             #[test]
             fn n_kv() {
                 assert_eq!(
-                    read_str2("{true nil, nil true}"),
+                    read_str("{true nil, nil true}"),
                     Ok(Some(Form::map(vec![
                         (Form::_true(), Form::nil()),
                         (Form::nil(), Form::_true())
@@ -502,7 +502,7 @@ mod tests {
             #[test]
             fn unterminated() {
                 assert_eq!(
-                    read_str2("{nil true"),
+                    read_str("{nil true"),
                     Err(Error {
                         error: VerboseError {
                             errors: vec![
@@ -520,7 +520,7 @@ mod tests {
             #[test]
             fn uneven_number_of_elements() {
                 assert_eq!(
-                    read_str2("{true nil nil}"),
+                    read_str("{true nil nil}"),
                     Err(Error {
                         error: VerboseError {
                             errors: vec![
@@ -545,13 +545,13 @@ mod tests {
 
             #[test]
             fn empty() {
-                assert_eq!(read_str2("[]"), Ok(Some(Form::empty_vector())));
+                assert_eq!(read_str("[]"), Ok(Some(Form::empty_vector())));
             }
 
             #[test]
             fn one_element() {
                 assert_eq!(
-                    read_str2("[nil]"),
+                    read_str("[nil]"),
                     Ok(Some(Form::vector(std::iter::once(Form::nil()))))
                 );
             }
@@ -559,7 +559,7 @@ mod tests {
             #[test]
             fn n_element() {
                 assert_eq!(
-                    read_str2("[true nil]"),
+                    read_str("[true nil]"),
                     Ok(Some(Form::vector(vec![Form::_true(), Form::nil()])))
                 )
             }
@@ -567,7 +567,7 @@ mod tests {
             #[test]
             fn unterminated() {
                 assert_eq!(
-                    read_str2("[nil true"),
+                    read_str("[nil true"),
                     Err(Error {
                         error: VerboseError {
                             errors: vec![

@@ -3,7 +3,7 @@ use std::io;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
-use mal::{pr_str, read_str, Form, ReaderError2 as MalError};
+use mal::{pr_str, read_str, Form, ReaderError as MalError};
 
 #[derive(Clone, Debug)]
 enum Error<'a> {
