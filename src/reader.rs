@@ -155,66 +155,60 @@ fn read_form_comment<'a, E: ParseErrorExt<&'a str>>(
 fn read_line_comment<'a, E: ParseErrorExt<&'a str>>(
     input: &'a str,
 ) -> IResult<&'a str, Comment, E> {
-    context(
+    context_map(
         "line_comment",
-        map(preceded(tag(";"), not_line_ending), |s: &'a str| {
-            Comment::Line(String::from(s))
-        }),
+        preceded(tag(";"), not_line_ending),
+        |s: &'a str| Comment::Line(String::from(s)),
     )(input)
 }
 
 fn read_comment<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
-    context(
+    context_map(
         "read_comment",
-        map(alt((read_form_comment, read_line_comment)), Form::Comment),
+        alt((read_form_comment, read_line_comment)),
+        Form::Comment,
     )(input)
 }
 
 fn read_list<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
-    context(
+    context_map(
         "read_list",
         with_kind!(
             ErrorKind::UnclosedDelimiter(')'),
-            map(
-                preceded(char('('), cut(many_till(read_form, char(')')))),
-                |(f, _)| Form::list(f)
-            ),
+            preceded(char('('), cut(many_till(read_form, char(')'))))
         ),
+        |(f, _)| Form::list(f),
     )(input)
 }
 
 fn read_map<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
-    context(
+    context_map(
         "read_map",
         with_kind!(
             ErrorKind::UnclosedDelimiter('}'),
-            map(
-                preceded(
-                    char('{'),
-                    cut(many_till(
-                        pair(
-                            read_form,
-                            with_kind!(ErrorKind::UnevenNumberOfMapElements, cut(read_form))
-                        ),
-                        char('}')
-                    ))
-                ),
-                |(kvs, _)| Form::map(kvs),
-            )
+            preceded(
+                char('{'),
+                cut(many_till(
+                    pair(
+                        read_form,
+                        with_kind!(ErrorKind::UnevenNumberOfMapElements, cut(read_form))
+                    ),
+                    char('}')
+                ))
+            ),
         ),
+        |(kvs, _)| Form::map(kvs),
     )(input)
 }
 
 fn read_vector<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
-    context(
+    context_map(
         "read_vector",
         with_kind!(
             ErrorKind::UnclosedDelimiter(']'),
-            map(
-                preceded(char('['), cut(many_till(read_form, char(']')))),
-                |(kvs, _)| Form::vector(kvs),
-            )
+            preceded(char('['), cut(many_till(read_form, char(']'))))
         ),
+        |(kvs, _)| Form::vector(kvs),
     )(input)
 }
 
@@ -228,9 +222,9 @@ macro_rules! reader_fns {
     } => {
         $(
             fn $name<'a, E: ParseErrorExt<&'a str>>($input : &'a str) -> IResult<&'a str, Form, E> {
-                context(
+                context_map(
                     stringify!($name),
-                    map($recognizer, |$recognized: &str| Form:: $form_constructor($expansion)),
+                    $recognizer, |$recognized: &str| Form:: $form_constructor($expansion),
                 )($input)
             }
         )*
