@@ -129,15 +129,26 @@ where
     input.split_at_position_complete(|item| whitespacechar(item.as_char()))
 }
 
+fn context_map<'a, I, O, E, F, G>(
+    ctx: &'static str,
+    recognizer: F,
+    form_constructor: G,
+) -> impl Fn(&'a str) -> IResult<&'a str, O, E>
+where
+    E: ParseErrorExt<&'a str>,
+    F: Fn(&'a str) -> IResult<&'a str, I, E>,
+    G: Fn(I) -> O,
+{
+    context(ctx, map(recognizer, form_constructor))
+}
+
 fn read_form_comment<'a, E: ParseErrorExt<&'a str>>(
     input: &'a str,
 ) -> IResult<&'a str, Comment, E> {
-    context(
+    context_map(
         "form_comment",
-        map(
-            preceded(tuple((tag("#_"), whitespace0)), read_form),
-            |form: Form| Comment::Form(Box::new(form)),
-        ),
+        preceded(tuple((tag("#_"), whitespace0)), read_form),
+        |form: Form| Comment::Form(Box::new(form)),
     )(input)
 }
 
