@@ -237,9 +237,11 @@ fn read_float<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str,
 }
 
 fn read_integer<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
-    context_map("read_integer", digit1, |i: &str| {
-        Form::integer(i.parse::<RugInteger>().unwrap())
-    })(input)
+    context_map(
+        "read_integer",
+        recognize(tuple((opt(char('-')), digit1))),
+        |i: &str| Form::integer(i.parse::<RugInteger>().unwrap()),
+    )(input)
 }
 
 fn read_rational<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
@@ -371,6 +373,11 @@ mod tests {
             #[test]
             fn one_hundred() {
                 assert_eq!(read_str("100"), Ok(Some(Form::integer(100u8))));
+            }
+
+            #[test]
+            fn negative_one() {
+                assert_eq!(read_str("-1"), Ok(Some(Form::integer(-1i8))));
             }
         }
 
