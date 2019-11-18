@@ -86,4 +86,8 @@ impl Form {
     pub fn rational(x: impl Into<RugRational>) -> Form {
         Form::Atom(Atom::Rational(Rational(x.into())))
     }
+
+    pub fn string(x: impl Into<String>) -> Form {
+        Form::Atom(Atom::String(x.into()))
+    }
 }

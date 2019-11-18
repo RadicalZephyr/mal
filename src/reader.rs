@@ -267,6 +267,14 @@ fn read_reader_macros<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<
     )(input)
 }
 
+fn read_string<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
+    context_map(
+        "read_string",
+        delimited(char('"'), whitespace0, char('"')),
+        Form::string,
+    )(input)
+}
+
 fn read_form<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     context(
         "read_form",
@@ -278,6 +286,7 @@ fn read_form<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, 
                 read_map,
                 read_vector,
                 read_reader_macros,
+                read_string,
                 read_float,
                 read_rational,
                 read_integer,
@@ -414,6 +423,15 @@ mod tests {
             #[test]
             fn one_hundred() {
                 assert_eq!(read_str("200/2"), Ok(Some(Form::rational((100, 1)))));
+            }
+        }
+
+        mod string {
+            use super::*;
+
+            #[test]
+            fn empty() {
+                assert_eq!(read_str("\"\""), Ok(Some(Form::string(""))));
             }
         }
     }
