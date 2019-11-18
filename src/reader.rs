@@ -26,7 +26,7 @@ trait ParseErrorExt<I>: ParseError<I> {
 }
 
 #[allow(dead_code)]
-#[derive(Copy, Clone, Debug, Display, PartialEq)]
+#[derive(Clone, Debug, Display, PartialEq)]
 pub enum ErrorKind {
     #[display(fmt = "this file contains an un-closed delimiter: `{}`", _0)]
     UnclosedDelimiter(char),
@@ -42,6 +42,9 @@ pub enum ErrorKind {
 
     #[display(fmt = "uneven number of elements found in map")]
     UnevenNumberOfMapElements,
+
+    #[display(fmt = "verbose error {:?}", _0)]
+    Verbose(VerboseErrorKind),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -103,8 +106,8 @@ where
     move |i: I| match f(i.clone()) {
         Ok(o) => Ok(o),
         Err(Err::Incomplete(i)) => Err(Err::Incomplete(i)),
-        Err(Err::Error(e)) => Err(Err::Error(E::add_kind(i, context, kind, e))),
-        Err(Err::Failure(e)) => Err(Err::Failure(E::add_kind(i, context, kind, e))),
+        Err(Err::Error(e)) => Err(Err::Error(E::add_kind(i, context, kind.clone(), e))),
+        Err(Err::Failure(e)) => Err(Err::Failure(E::add_kind(i, context, kind.clone(), e))),
     }
 }
 
