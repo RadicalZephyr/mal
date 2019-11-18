@@ -170,46 +170,51 @@ fn read_comment<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a st
     )(input)
 }
 
+fn read_delimited_form_seq<'a, C, I, F, E: ParseErrorExt<&'a str>>(
+    ctx: &'static str,
+    constructor: C,
+    open_delimiter: char,
+    item: F,
+    close_delimiter: char,
+) -> impl Fn(&'a str) -> IResult<&'a str, Form, E>
+where
+    C: Fn(Vec<I>) -> Form,
+    F: Fn(&'a str) -> IResult<&'a str, I, E>,
+{
+    move |input: &str| {
+        context_map(
+            ctx,
+            preceded(
+                char(open_delimiter),
+                with_kind!(
+                    ErrorKind::UnclosedDelimiter(close_delimiter),
+                    cut(many_till(&item, char(close_delimiter)))
+                ),
+            ),
+            |(f, _)| constructor(f),
+        )(input)
+    }
+}
+
 fn read_list<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
-    context_map(
-        "read_list",
-        with_kind!(
-            ErrorKind::UnclosedDelimiter(')'),
-            preceded(char('('), cut(many_till(read_form, char(')'))))
-        ),
-        |(f, _)| Form::list(f),
-    )(input)
+    read_delimited_form_seq("read_list", Form::list, '(', read_form, ')')(input)
 }
 
 fn read_map<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
-    context_map(
-        "read_map",
-        with_kind!(
-            ErrorKind::UnclosedDelimiter('}'),
-            preceded(
-                char('{'),
-                cut(many_till(
-                    pair(
-                        read_form,
-                        with_kind!(ErrorKind::UnevenNumberOfMapElements, cut(read_form))
-                    ),
-                    char('}')
-                ))
-            ),
+    read_delimited_form_seq(
+        "read_list",
+        Form::map,
+        '{',
+        pair(
+            read_form,
+            with_kind!(ErrorKind::UnevenNumberOfMapElements, cut(read_form)),
         ),
-        |(kvs, _)| Form::map(kvs),
+        '}',
     )(input)
 }
 
 fn read_vector<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
-    context_map(
-        "read_vector",
-        with_kind!(
-            ErrorKind::UnclosedDelimiter(']'),
-            preceded(char('['), cut(many_till(read_form, char(']'))))
-        ),
-        |(kvs, _)| Form::vector(kvs),
-    )(input)
+    read_delimited_form_seq("read_vector", Form::vector, '[', read_form, ']')(input)
 }
 
 // ---------------------------------------------
@@ -452,7 +457,10 @@ mod tests {
                                 ("", Nom(Tag)),
                                 ("", Nom(Alt)),
                                 ("", Nom(ManyTill)),
-                                ("(nil true", Context("ErrorKind::UnclosedDelimiter(\')\')"))
+                                (
+                                    "nil true",
+                                    Context("ErrorKind::UnclosedDelimiter(close_delimiter)")
+                                )
                             ]
                         },
                         kind: Some(ErrorKind::UnclosedDelimiter(')')),
@@ -503,7 +511,10 @@ mod tests {
                                 ("", Nom(Tag)),
                                 ("", Nom(Alt)),
                                 ("", Nom(ManyTill)),
-                                ("{nil true", Context("ErrorKind::UnclosedDelimiter(\'}\')"))
+                                (
+                                    "nil true",
+                                    Context("ErrorKind::UnclosedDelimiter(close_delimiter)")
+                                )
                             ]
                         },
                         kind: Some(ErrorKind::UnclosedDelimiter('}')),
@@ -568,7 +579,10 @@ mod tests {
                                 ("", Nom(Tag)),
                                 ("", Nom(Alt)),
                                 ("", Nom(ManyTill)),
-                                ("[nil true", Context("ErrorKind::UnclosedDelimiter(\']\')"))
+                                (
+                                    "nil true",
+                                    Context("ErrorKind::UnclosedDelimiter(close_delimiter)")
+                                )
                             ]
                         },
                         kind: Some(ErrorKind::UnclosedDelimiter(']')),
