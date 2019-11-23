@@ -124,6 +124,17 @@ fn whitespacechar(c: char) -> bool {
     }
 }
 
+fn string0<T, E: ParseErrorExt<T>>(input: T) -> IResult<T, T, E>
+where
+    T: InputTakeAtPosition,
+    <T as InputTakeAtPosition>::Item: AsChar,
+{
+    input.split_at_position_complete(|item| match item.as_char() {
+        '"' => true,
+        _ => false,
+    })
+}
+
 fn whitespace0<T, E: ParseErrorExt<T>>(input: T) -> IResult<T, T, E>
 where
     T: InputTakeAtPosition,
@@ -270,7 +281,7 @@ fn read_reader_macros<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<
 fn read_string<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     context_map(
         "read_string",
-        delimited(char('"'), whitespace0, char('"')),
+        delimited(char('"'), string0, char('"')),
         Form::string,
     )(input)
 }
@@ -432,6 +443,11 @@ mod tests {
             #[test]
             fn empty() {
                 assert_eq!(read_str("\"\""), Ok(Some(Form::string(""))));
+            }
+
+            #[test]
+            fn letters() {
+                assert_eq!(read_str("\"abc\""), Ok(Some(Form::string("abc"))));
             }
         }
     }
