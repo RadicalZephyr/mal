@@ -90,4 +90,8 @@ impl Form {
     pub fn string(x: impl Into<String>) -> Form {
         Form::Atom(Atom::String(x.into()))
     }
+
+    pub fn symbol(x: impl Into<String>) -> Form {
+        Form::Atom(Atom::Symbol(x.into()))
+    }
 }

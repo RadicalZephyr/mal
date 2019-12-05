@@ -135,6 +135,34 @@ where
     })
 }
 
+fn not_symbolchar(c: char) -> bool {
+    match c {
+        '"' | '\'' | '(' | ')' | '[' | ']' | '{' | '}' | '#' | ' ' | ',' | '\r' | '\n' | '\t' => {
+            true
+        }
+        _ => false,
+    }
+}
+
+#[allow(dead_code)]
+fn symbolchar0<T, E>(input: T) -> IResult<T, T, E>
+where
+    T: InputTakeAtPosition,
+    <T as InputTakeAtPosition>::Item: AsChar,
+    E: ParseErrorExt<T>,
+{
+    input.split_at_position_complete(|item| not_symbolchar(item.as_char()))
+}
+
+fn symbolchar1<T, E: ParseErrorExt<T>>(input: T) -> IResult<T, T, E>
+where
+    T: InputTakeAtPosition,
+    <T as InputTakeAtPosition>::Item: AsChar,
+    E: ParseErrorExt<T>,
+{
+    input.split_at_position1_complete(|item| not_symbolchar(item.as_char()), NomErrorKind::Space)
+}
+
 fn whitespace0<T, E: ParseErrorExt<T>>(input: T) -> IResult<T, T, E>
 where
     T: InputTakeAtPosition,
@@ -202,7 +230,10 @@ where
                 char(open_delimiter),
                 with_kind!(
                     ErrorKind::UnclosedDelimiter(close_delimiter),
-                    cut(many_till(&item, char(close_delimiter)))
+                    cut(many_till(
+                        &item,
+                        preceded(whitespace0, char(close_delimiter))
+                    ))
                 ),
             ),
             |(f, _)| constructor(f),
@@ -286,6 +317,21 @@ fn read_string<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str
     )(input)
 }
 
+fn read_symbol<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
+    context_map("read_symbol", symbolchar1, Form::symbol)(input)
+}
+
+fn read_symbol_like_atoms<'a, E: ParseErrorExt<&'a str>>(
+    input: &'a str,
+) -> IResult<&'a str, Form, E> {
+    alt((
+        value(Form::nil(), tag("nil")),
+        value(Form::_true(), tag("true")),
+        value(Form::_false(), tag("false")),
+        read_symbol,
+    ))(input)
+}
+
 fn read_form<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, Form, E> {
     context(
         "read_form",
@@ -301,9 +347,7 @@ fn read_form<'a, E: ParseErrorExt<&'a str>>(input: &'a str) -> IResult<&'a str, 
                 read_float,
                 read_rational,
                 read_integer,
-                value(Form::nil(), tag("nil")),
-                value(Form::_true(), tag("true")),
-                value(Form::_false(), tag("false")),
+                read_symbol_like_atoms,
             )),
         ),
     )(input)
@@ -450,6 +494,28 @@ mod tests {
                 assert_eq!(read_str("\"abc\""), Ok(Some(Form::string("abc"))));
             }
         }
+
+        mod symbol {
+            use super::*;
+
+            #[test]
+            fn letters() {
+                assert_eq!(read_str("abc"), Ok(Some(Form::symbol("abc"))));
+            }
+
+            #[test]
+            fn numbers() {
+                assert_eq!(read_str("a123"), Ok(Some(Form::symbol("a123"))));
+            }
+
+            #[test]
+            fn special_chars() {
+                assert_eq!(
+                    read_str("z!@$%^&*-_+=|"),
+                    Ok(Some(Form::symbol("z!@$%^&*-_+=|")))
+                );
+            }
+        }
     }
 
     mod compound {
@@ -459,7 +525,7 @@ mod tests {
             use super::*;
 
             use nom::error::{
-                ErrorKind::{Alt, ManyTill, Tag},
+                ErrorKind::{Alt, ManyTill, Space},
                 VerboseErrorKind::{Context, Nom},
             };
 
@@ -491,7 +557,8 @@ mod tests {
                     Err(Error {
                         error: VerboseError {
                             errors: vec![
-                                ("", Nom(Tag)),
+                                ("", Nom(Space)),
+                                ("", Nom(Alt)),
                                 ("", Nom(Alt)),
                                 ("", Nom(ManyTill)),
                                 (
@@ -510,7 +577,7 @@ mod tests {
             use super::*;
 
             use nom::error::{
-                ErrorKind::{Alt, ManyTill, Tag},
+                ErrorKind::{Alt, ManyTill, Space},
                 VerboseErrorKind::{Context, Nom},
             };
 
@@ -545,7 +612,8 @@ mod tests {
                     Err(Error {
                         error: VerboseError {
                             errors: vec![
-                                ("", Nom(Tag)),
+                                ("", Nom(Space)),
+                                ("", Nom(Alt)),
                                 ("", Nom(Alt)),
                                 ("", Nom(ManyTill)),
                                 (
@@ -566,7 +634,8 @@ mod tests {
                     Err(Error {
                         error: VerboseError {
                             errors: vec![
-                                ("}", Nom(Tag)),
+                                ("}", Nom(Space)),
+                                ("}", Nom(Alt)),
                                 ("}", Nom(Alt)),
                                 ("}", Context("ErrorKind::UnevenNumberOfMapElements"))
                             ]
@@ -581,7 +650,7 @@ mod tests {
             use super::*;
 
             use nom::error::{
-                ErrorKind::{Alt, ManyTill, Tag},
+                ErrorKind::{Alt, ManyTill, Space},
                 VerboseErrorKind::{Context, Nom},
             };
 
@@ -613,7 +682,8 @@ mod tests {
                     Err(Error {
                         error: VerboseError {
                             errors: vec![
-                                ("", Nom(Tag)),
+                                ("", Nom(Space)),
+                                ("", Nom(Alt)),
                                 ("", Nom(Alt)),
                                 ("", Nom(ManyTill)),
                                 (
